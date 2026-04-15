@@ -51,7 +51,7 @@ export const DeclarationWorkspace: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!window.confirm('Submit this declaration to ASYCUDAWorld? This will change the status to Submitted.')) return;
+    if (!window.confirm('Mark this declaration as submitted? This means you have uploaded the XML to ASYCUDAWorld. The status will change to Submitted.')) return;
     setSubmitting(true);
 
     // First save if it has local ID
@@ -165,7 +165,7 @@ export const DeclarationWorkspace: React.FC = () => {
               onClick={handleSubmit}
               disabled={submitting}
             >
-              {submitting ? 'Submitting...' : 'Submit Declaration'}
+              {submitting ? 'Submitting...' : 'Mark as Submitted'}
             </Button>
           )}
 
