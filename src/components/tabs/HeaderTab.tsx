@@ -82,11 +82,13 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
 // ── Supabase search functions ─────────────────────────────────────────────────
 
 async function searchImporters(q: string) {
-  const { data } = await supabase
+  console.log('searchImporters called with:', q);
+  const { data, error } = await supabase
     .from('importers')
     .select('asycuda_code, name, address1, default_duty_terms')
     .or(`name.ilike.%${q}%,asycuda_code.ilike.%${q}%`)
     .limit(10);
+  console.log('searchImporters result:', { data, error });
   return (data || []).map((r: any) => ({
     value: r.asycuda_code,
     label: r.name,
@@ -124,13 +126,37 @@ export const HeaderTab: React.FC = () => {
   useEffect(() => {
     // Load all small reference tables on mount
     Promise.all([
-      supabase.from('countries').select('code, name').order('code').then(r => setCountries(r.data || [])),
-      supabase.from('locations_of_goods').select('code, place').order('code').then(r => setLocations(r.data || [])),
-      supabase.from('entrepots').select('code, description').order('code').then(r => setEntrepots(r.data || [])),
-      supabase.from('payment_accounts').select('code, description').order('code').then(r => setPaymentAccounts(r.data || [])),
-      supabase.from('delivery_terms').select('code, description').order('code').then(r => setDeliveryTerms(r.data || [])),
+      supabase.from('countries').select('code, name').order('code')
+        .then(r => {
+          console.log('countries result:', { data: r.data?.length, error: r.error });
+          setCountries(r.data || []);
+        }),
+      supabase.from('locations_of_goods').select('code, place').order('code')
+        .then(r => {
+          console.log('locations_of_goods result:', { data: r.data?.length, error: r.error });
+          setLocations(r.data || []);
+        }),
+      supabase.from('entrepots').select('code, description').order('code')
+        .then(r => {
+          console.log('entrepots result:', { data: r.data?.length, error: r.error });
+          setEntrepots(r.data || []);
+        }),
+      supabase.from('payment_accounts').select('code, description').order('code')
+        .then(r => {
+          console.log('payment_accounts result:', { data: r.data?.length, error: r.error });
+          setPaymentAccounts(r.data || []);
+        }),
+      supabase.from('delivery_terms').select('code, description').order('code')
+        .then(r => {
+          console.log('delivery_terms result:', { data: r.data?.length, error: r.error });
+          setDeliveryTerms(r.data || []);
+        }),
       // Port of loading — filter to Aruba ports only (AWXXX)
-      supabase.from('ports').select('code, description').ilike('code', 'AW%').order('code').then(r => setLoadingPorts(r.data || [])),
+      supabase.from('ports').select('code, description').ilike('code', 'AW%').order('code')
+        .then(r => {
+          console.log('ports result:', { data: r.data?.length, error: r.error });
+          setLoadingPorts(r.data || []);
+        }),
       // Offices — from locations_of_goods or a fixed list for now
     ]);
   }, []);
