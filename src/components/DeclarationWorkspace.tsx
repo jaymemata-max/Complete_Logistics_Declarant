@@ -4,10 +4,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { ArrowLeft, Save, FileText, Package, LayoutGrid, FileCode2, SplitSquareHorizontal, BookTemplate, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, Save, FileText, Package, LayoutGrid, FileCode2, SplitSquareHorizontal, BookTemplate, CheckCircle2, XCircle, Car } from 'lucide-react';
 import { HeaderTab } from './tabs/HeaderTab';
 import { ItemsTab } from './tabs/ItemsTab';
 import { ContainersTab } from './tabs/ContainersTab';
+import { VehicleTab } from './tabs/VehicleTab';
 import { SplitTab } from './tabs/SplitTab';
 import { XmlPreviewTab } from './tabs/XmlPreviewTab';
 import { saveDeclaration, updateDeclarationStatus, saveTemplate } from '../lib/db';
@@ -221,6 +222,7 @@ export const DeclarationWorkspace: React.FC = () => {
               {[
                 { value: 'header', icon: FileText, label: 'Header' },
                 { value: 'items', icon: Package, label: 'Items' },
+                { value: 'vehicles', icon: Car, label: 'Vehicles' },
                 { value: 'containers', icon: LayoutGrid, label: 'Containers' },
                 { value: 'split', icon: SplitSquareHorizontal, label: 'Split / Degroupage' },
                 { value: 'xml', icon: FileCode2, label: 'XML Preview' },
@@ -242,6 +244,9 @@ export const DeclarationWorkspace: React.FC = () => {
               </TabsContent>
               <TabsContent value="items" className="mt-0">
                 <ItemsTab />
+              </TabsContent>
+              <TabsContent value="vehicles" className="mt-0">
+                <VehicleTab />
               </TabsContent>
               <TabsContent value="containers" className="mt-0">
                 <ContainersTab />

@@ -3,6 +3,7 @@ import { Declaration, DeclarationHeader, DeclarationItem, DeclarationContainer, 
 interface DeclarationContextType {
   declaration: Declaration | null;
   setDeclaration: (decl: Declaration | null) => void;
+  updateDeclaration: (updates: Partial<Declaration>) => void;
   updateHeader: (updates: Partial<DeclarationHeader>) => void;
   addItem: () => void;
   updateItem: (id: string, updates: Partial<DeclarationItem>) => void;
@@ -29,6 +30,10 @@ export const useDeclaration = () => {
 
 export const DeclarationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [declaration, setDeclaration] = useState<Declaration | null>(null);
+
+  const updateDeclaration = (updates: Partial<Declaration>) => {
+    setDeclaration(prev => prev ? { ...prev, ...updates } : null);
+  };
 
   const updateHeader = (updates: Partial<DeclarationHeader>) => {
     setDeclaration(prev => prev ? { ...prev, header: { ...prev.header, ...updates } } : null);
@@ -147,6 +152,7 @@ export const DeclarationProvider: React.FC<{ children: ReactNode }> = ({ childre
     <DeclarationContext.Provider value={{
       declaration,
       setDeclaration,
+      updateDeclaration,
       updateHeader,
       addItem,
       updateItem,
