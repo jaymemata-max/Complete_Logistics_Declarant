@@ -1,194 +1,272 @@
 import { Declaration } from '../types';
 
+/**
+ * Generates ASYCUDA SAD XML matching the format accepted by Aruba Customs.
+ * Structure validated against real VD exports and the ASYCUDA SAD XML spec.
+ *
+ * Key notes:
+ * - ASYCUDA spells "Deffered" with double 'f' — this is intentional
+ * - Container_flag, Location_of_goods come before Means_of_transport in Transport
+ * - Declarant Reference uses <Year> and <Number>, not <Reference_year>/<Reference_number>
+ * - Valuation uses individual cost elements, not a Total wrapper
+ * - Containers section always emitted (empty if no containers)
+ */
 export function generateAsycudaXml(declaration: Declaration): string {
   const { header, items, containers } = declaration;
 
-  // Helper to safely format numbers and strings
-  const formatNum = (num: number | undefined) => num !== undefined ? num.toString() : '';
-  const formatStr = (str: string | undefined) => str || '';
+  const s = (val: string | undefined | null): string =>
+    (val || '').trim();
 
-  // TODO: The exact XML shape is inferred from the prompt.
-  // Real implementation would need to match the specific ASYCUDA schema exactly.
-  
+  const n = (val: number | undefined | null): string =>
+    val !== undefined && val !== null ? val.toFixed(2) : '0.00';
+
+  const t = (indent: number, tag: string, content: string): string =>
+    `${' '.repeat(indent)}<${tag}>${content}</${tag}>\n`;
+
+  const empty = (indent: number, tag: string): string =>
+    `${' '.repeat(indent)}<${tag}></${tag}>\n`;
+
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
   xml += `<ASYCUDA>\n`;
   xml += `  <SAD>\n`;
-  
-  // Assessment_notice (Mocked empty or minimal as per typical submission)
+
+  // ── Assessment_notice ──────────────────────────────────────────────────────
   xml += `    <Assessment_notice>\n`;
   xml += `    </Assessment_notice>\n`;
 
-  // Identification
+  // ── Identification ─────────────────────────────────────────────────────────
   xml += `    <Identification>\n`;
+  xml += t(6, 'Manifest_reference_number', s(header.manifestReferenceNumber));
+  xml += t(6, 'Total_number_of_packages', String(header.totalNumberOfPackages || 0));
   xml += `      <Office_segment>\n`;
-  xml += `        <Customs_clearance_office_code>${formatStr(header.customsClearanceOfficeCode)}</Customs_clearance_office_code>\n`;
+  xml += t(8, 'Customs_clearance_office_code', s(header.customsClearanceOfficeCode));
   xml += `      </Office_segment>\n`;
-  xml += `      <Type_of_declaration>${formatStr(header.typeOfDeclaration)}</Type_of_declaration>\n`;
-  xml += `      <Declaration_sgl_segment>\n`;
-  xml += `        <General_procedure_code>${formatStr(header.generalProcedureCode)}</General_procedure_code>\n`;
-  xml += `      </Declaration_sgl_segment>\n`;
-  xml += `      <Manifest_reference_number>${formatStr(header.manifestReferenceNumber)}</Manifest_reference_number>\n`;
+  xml += `      <Type>\n`;
+  xml += t(8, 'Type_of_declaration', s(header.typeOfDeclaration));
+  xml += t(8, 'General_procedure_code', s(header.generalProcedureCode));
+  xml += `      </Type>\n`;
   xml += `    </Identification>\n`;
 
-  // Traders
+  // ── Traders ────────────────────────────────────────────────────────────────
   xml += `    <Traders>\n`;
   xml += `      <Consignee>\n`;
-  xml += `        <Consignee_code>${formatStr(header.consigneeCode)}</Consignee_code>\n`;
-  xml += `        <Consignee_name>${formatStr(header.consigneeName)}</Consignee_name>\n`;
+  xml += t(8, 'Consignee_code', s(header.consigneeCode));
+  xml += t(8, 'Consignee_name', s(header.consigneeName));
   xml += `      </Consignee>\n`;
   xml += `    </Traders>\n`;
 
-  // Declarant
+  // ── Declarant ──────────────────────────────────────────────────────────────
   xml += `    <Declarant>\n`;
-  xml += `      <Declarant_code>${formatStr(header.declarantCode)}</Declarant_code>\n`;
-  xml += `      <Declarant_name>${formatStr(header.declarantName)}</Declarant_name>\n`;
+  xml += t(6, 'Declarant_code', s(header.declarantCode));
+  xml += t(6, 'Declarant_name', s(header.declarantName));
   xml += `      <Reference>\n`;
-  xml += `        <Reference_year>${formatStr(header.referenceYear)}</Reference_year>\n`;
-  xml += `        <Reference_number>${formatStr(header.referenceNumber)}</Reference_number>\n`;
+  xml += t(8, 'Year', s(header.referenceYear));
+  xml += t(8, 'Number', s(header.referenceNumber));
   xml += `      </Reference>\n`;
   xml += `    </Declarant>\n`;
 
-  // General_information
+  // ── General_information ───────────────────────────────────────────────────
   xml += `    <General_information>\n`;
   xml += `      <Country>\n`;
-  xml += `        <Country_first_destination>${formatStr(header.countryFirstDestination)}</Country_first_destination>\n`;
-  xml += `        <Trading_country>${formatStr(header.tradingCountry)}</Trading_country>\n`;
+  xml += t(8, 'Country_first_destination', s(header.countryFirstDestination));
+  xml += t(8, 'Trading_country', s(header.tradingCountry));
   xml += `        <Export>\n`;
-  xml += `          <Export_country_code>${formatStr(header.exportCountryCode)}</Export_country_code>\n`;
+  xml += t(10, 'Export_country_code', s(header.exportCountryCode));
   xml += `        </Export>\n`;
   xml += `        <Destination>\n`;
-  xml += `          <Destination_country_code>${formatStr(header.destinationCountryCode)}</Destination_country_code>\n`;
+  xml += t(10, 'Destination_country_code', s(header.destinationCountryCode));
   xml += `        </Destination>\n`;
   xml += `      </Country>\n`;
-  xml += `      <Value_details>\n`;
-  xml += `      </Value_details>\n`;
   xml += `    </General_information>\n`;
 
-  // Transport
+  // ── Transport ─────────────────────────────────────────────────────────────
   xml += `    <Transport>\n`;
+  xml += t(6, 'Container_flag', header.containerFlag ? 'true' : 'false');
+  xml += t(6, 'Location_of_goods', s(header.locationOfGoods));
+  // Field 30a — only emit if filled in
+  if (header.locationOfGoodsAddress?.trim()) {
+    xml += t(6, 'Location_of_goods_address', s(header.locationOfGoodsAddress));
+  }
   xml += `      <Means_of_transport>\n`;
   xml += `        <Departure_arrival_information>\n`;
-  xml += `          <Identity>${formatStr(header.transportIdentity)}</Identity>\n`;
-  xml += `          <Nationality>${formatStr(header.transportNationality)}</Nationality>\n`;
+  xml += t(10, 'Identity', s(header.transportIdentity));
+  xml += t(10, 'Nationality', s(header.transportNationality));
   xml += `        </Departure_arrival_information>\n`;
   xml += `        <Border_information>\n`;
-  xml += `          <Identity>${formatStr(header.borderTransportIdentity)}</Identity>\n`;
-  xml += `          <Nationality>${formatStr(header.borderTransportNationality)}</Nationality>\n`;
-  xml += `          <Mode>${formatStr(header.borderTransportMode)}</Mode>\n`;
+  if (header.borderTransportIdentity?.trim()) {
+    xml += t(10, 'Identity', s(header.borderTransportIdentity));
+  }
+  if (header.borderTransportNationality?.trim()) {
+    xml += t(10, 'Nationality', s(header.borderTransportNationality));
+  }
+  xml += t(10, 'Mode', s(header.borderTransportMode));
   xml += `        </Border_information>\n`;
   xml += `      </Means_of_transport>\n`;
   xml += `      <Delivery_terms>\n`;
-  xml += `        <Code>${formatStr(header.deliveryTermsCode)}</Code>\n`;
-  xml += `        <Place>${formatStr(header.deliveryTermsPlace)}</Place>\n`;
+  xml += t(8, 'Code', s(header.deliveryTermsCode));
+  xml += t(8, 'Place', s(header.deliveryTermsPlace));
   xml += `      </Delivery_terms>\n`;
   xml += `      <Border_office>\n`;
-  xml += `        <Code>${formatStr(header.borderOfficeCode)}</Code>\n`;
+  xml += t(8, 'Code', s(header.borderOfficeCode));
   xml += `      </Border_office>\n`;
   xml += `      <Place_of_loading>\n`;
-  xml += `        <Code>${formatStr(header.placeOfLoadingCode)}</Code>\n`;
+  xml += t(8, 'Code', s(header.placeOfLoadingCode));
   xml += `      </Place_of_loading>\n`;
-  xml += `      <Location_of_goods>${formatStr(header.locationOfGoods)}</Location_of_goods>\n`;
   xml += `    </Transport>\n`;
 
-  // Financial
+  // ── Financial ─────────────────────────────────────────────────────────────
+  // Note: ASYCUDA spells "Deffered" with double 'f' — intentional
   xml += `    <Financial>\n`;
+  xml += t(6, 'Deffered_payment_reference', s(header.deferredPaymentReference));
   xml += `      <Financial_transaction>\n`;
-  xml += `        <Code1>${formatStr(header.financialTransactionCode1)}</Code1>\n`;
-  xml += `        <Code2>${formatStr(header.financialTransactionCode2)}</Code2>\n`;
+  xml += t(8, 'Code_1', s(header.financialTransactionCode1));
+  xml += t(8, 'Code_2', s(header.financialTransactionCode2));
   xml += `      </Financial_transaction>\n`;
-  xml += `      <Deferred_payment>\n`;
-  xml += `        <Deferred_payment_reference>${formatStr(header.deferredPaymentReference)}</Deferred_payment_reference>\n`;
-  xml += `      </Deferred_payment>\n`;
   xml += `    </Financial>\n`;
 
-  // Warehouse
-  if (header.warehouseIdentification) {
-    xml += `    <Warehouse>\n`;
-    xml += `      <Identification>${formatStr(header.warehouseIdentification)}</Identification>\n`;
-    xml += `    </Warehouse>\n`;
-  } else {
-    xml += `    <Warehouse/>\n`;
-  }
+  // ── Warehouse ─────────────────────────────────────────────────────────────
+  xml += `    <Warehouse>\n`;
+  xml += t(6, 'Identification', s(header.warehouseIdentification));
+  xml += `    </Warehouse>\n`;
 
-  // Valuation
+  // ── Valuation ─────────────────────────────────────────────────────────────
   xml += `    <Valuation>\n`;
-  xml += `      <Calculation_working_mode>1</Calculation_working_mode>\n`;
-  xml += `      <Total>\n`;
-  xml += `        <Total_invoice>${formatNum(header.invoiceAmount)}</Total_invoice>\n`;
-  xml += `        <Total_weight>${formatNum(header.grossWeight)}</Total_weight>\n`;
-  xml += `      </Total>\n`;
+  xml += `      <Invoice>\n`;
+  xml += t(8, 'Amount_foreign_currency', n(header.invoiceAmount));
+  xml += t(8, 'Currency_code', s(header.invoiceCurrencyCode) || 'USD');
+  xml += `      </Invoice>\n`;
+  xml += `      <External_freight>\n`;
+  xml += t(8, 'Amount_foreign_currency', n(header.externalFreightAmount));
+  xml += t(8, 'Currency_code', s(header.externalFreightCurrencyCode) || 'USD');
+  xml += `      </External_freight>\n`;
+  xml += `      <Insurance>\n`;
+  xml += t(8, 'Amount_foreign_currency', n(header.insuranceAmount));
+  xml += t(8, 'Currency_code', s(header.insuranceCurrencyCode) || 'USD');
+  xml += `      </Insurance>\n`;
+  xml += `      <Other_cost>\n`;
+  xml += t(8, 'Amount_foreign_currency', n(header.otherCostAmount));
+  xml += t(8, 'Currency_code', s(header.otherCostCurrencyCode) || 'USD');
+  xml += `      </Other_cost>\n`;
+  xml += `      <Deduction>\n`;
+  xml += t(8, 'Amount_foreign_currency', n(header.deductionAmount));
+  xml += t(8, 'Currency_code', s(header.deductionCurrencyCode) || 'USD');
+  xml += `      </Deduction>\n`;
   xml += `    </Valuation>\n`;
 
-  // Containers
+  // ── Containers ────────────────────────────────────────────────────────────
+  // Always emit the Containers block (empty if none)
+  xml += `    <Containers>\n`;
   if (header.containerFlag && containers.length > 0) {
-    xml += `    <Containers>\n`;
     containers.forEach(c => {
       xml += `      <Container>\n`;
-      xml += `        <Container_identity>${formatStr(c.containerNumber)}</Container_identity>\n`;
-      xml += `        <Container_type>${formatStr(c.containerType)}</Container_type>\n`;
-      xml += `        <Empty_full_indicator>${formatStr(c.emptyFullIndicator)}</Empty_full_indicator>\n`;
-      xml += `        <Goods_description>${formatStr(c.goodsDescription)}</Goods_description>\n`;
-      xml += `        <Packages_type>${formatStr(c.packagesType)}</Packages_type>\n`;
-      xml += `        <Packages_number>${formatNum(c.packagesNumber)}</Packages_number>\n`;
-      xml += `        <Packages_weight>${formatNum(c.packagesWeight)}</Packages_weight>\n`;
+      xml += t(8, 'Item_number', String(c.itemNumber || ''));
+      xml += t(8, 'Container_identity', s(c.containerNumber));
+      xml += t(8, 'Container_type', s(c.containerType));
+      xml += t(8, 'Empty_full_indicator', s(c.emptyFullIndicator));
+      xml += t(8, 'Goods_description', s(c.goodsDescription));
+      xml += t(8, 'Packages_type', s(c.packagesType));
+      xml += t(8, 'Packages_number', n(c.packagesNumber));
+      xml += t(8, 'Packages_weight', n(c.packagesWeight));
       xml += `      </Container>\n`;
     });
-    xml += `    </Containers>\n`;
   }
+  xml += `    </Containers>\n`;
 
   xml += `  </SAD>\n`;
 
-  // Items
+  // ── Items ─────────────────────────────────────────────────────────────────
   xml += `  <Items>\n`;
+
   items.forEach(item => {
     xml += `    <Item>\n`;
+
+    // Packages
     xml += `      <Packages>\n`;
-    xml += `        <Number_of_packages>${formatNum(item.numberOfPackages)}</Number_of_packages>\n`;
-    xml += `        <Kind_of_packages_code>${formatStr(item.kindOfPackagesCode)}</Kind_of_packages_code>\n`;
-    xml += `        <Marks1_of_packages>${formatStr(item.marks1)}</Marks1_of_packages>\n`;
-    xml += `        <Marks2_of_packages>${formatStr(item.marks2)}</Marks2_of_packages>\n`;
+    xml += t(8, 'Number_of_packages', String(item.numberOfPackages || 0));
+    xml += t(8, 'Marks1_of_packages', s(item.marks1));
+    xml += t(8, 'Marks2_of_packages', s(item.marks2));
+    xml += t(8, 'Kind_of_packages_code', s(item.kindOfPackagesCode));
     xml += `      </Packages>\n`;
-    
+
+    // Incoterms (item-level — mirrors header delivery terms, per VD format)
+    xml += `      <Incoterms>\n`;
+    xml += t(8, 'Code', s(header.deliveryTermsCode));
+    xml += t(8, 'Place', s(header.deliveryTermsPlace));
+    xml += `      </Incoterms>\n`;
+
+    // Tariff
     xml += `      <Tariff>\n`;
-    xml += `        <Hs_code>\n`;
-    xml += `          <Commodity_code>${formatStr(item.hsCode)}</Commodity_code>\n`;
-    xml += `        </Hs_code>\n`;
-    xml += `        <Extended_customs_procedure>${formatStr(item.extendedCustomsProcedure)}</Extended_customs_procedure>\n`;
-    xml += `        <National_customs_procedure>${formatStr(item.nationalCustomsProcedure)}</National_customs_procedure>\n`;
+    xml += t(8, 'Extended_customs_procedure', s(item.extendedCustomsProcedure));
+    xml += t(8, 'National_customs_procedure', s(item.nationalCustomsProcedure));
+    // Field 36 — Preference
+    if (item.preferenceCode?.trim()) {
+      xml += t(8, 'Preference_code', s(item.preferenceCode));
+    }
+    xml += t(8, 'Valuation_method_code', s(item.valuationMethodCode) || '1');
+    xml += `        <Harmonized_system>\n`;
+    xml += t(10, 'Commodity_code', s(item.hsCode));
+    xml += `        </Harmonized_system>\n`;
+    // Field 41 — Supplementary units
     if (item.supplementaryUnits && item.supplementaryUnits.length > 0) {
       item.supplementaryUnits.forEach(su => {
         xml += `        <Supplementary_unit>\n`;
-        xml += `          <Supplementary_unit_code>${formatStr(su.code)}</Supplementary_unit_code>\n`;
-        xml += `          <Supplementary_unit_quantity>${formatNum(su.quantity)}</Supplementary_unit_quantity>\n`;
+        xml += t(10, 'Supplementary_unit_code', s(su.code));
+        xml += t(10, 'Supplementary_unit_quantity', n(su.quantity));
         xml += `        </Supplementary_unit>\n`;
       });
     }
+    // Field 39 — Quota
+    if (item.quotaNumber?.trim()) {
+      xml += `        <Quota>\n`;
+      xml += t(10, 'Quota_code', s(item.quotaNumber));
+      xml += `        </Quota>\n`;
+    }
     xml += `      </Tariff>\n`;
 
+    // Goods description
     xml += `      <Goods_description>\n`;
-    xml += `        <Country_of_origin_code>${formatStr(item.countryOfOriginCode)}</Country_of_origin_code>\n`;
-    xml += `        <Description_of_goods>${formatStr(item.descriptionOfGoods)}</Description_of_goods>\n`;
-    xml += `        <Commercial_Description>${formatStr(item.commercialDescription)}</Commercial_Description>\n`;
+    xml += t(8, 'Country_of_origin_code', s(item.countryOfOriginCode));
+    xml += t(8, 'Description_of_goods', s(item.descriptionOfGoods));
+    xml += t(8, 'Commercial_description', s(item.commercialDescription));
     xml += `      </Goods_description>\n`;
 
-    xml += `      <Previous_document>\n`;
-    xml += `        <Summary_declaration>${formatStr(item.previousDocumentSummaryDeclaration)}</Summary_declaration>\n`;
-    xml += `        <Summary_declaration_sl>${formatStr(item.previousDocumentSummaryDeclarationSubline)}</Summary_declaration_sl>\n`;
-    xml += `      </Previous_document>\n`;
-
+    // Valuation item
     xml += `      <Valuation_item>\n`;
-    xml += `        <Weight_itm>\n`;
-    xml += `          <Gross_weight_itm>${formatNum(item.grossWeight)}</Gross_weight_itm>\n`;
-    xml += `          <Net_weight_itm>${formatNum(item.netWeight)}</Net_weight_itm>\n`;
-    xml += `        </Weight_itm>\n`;
-    xml += `        <Item_Invoice>\n`;
-    xml += `          <Amount_foreign>${formatNum(item.invoiceAmount)}</Amount_foreign>\n`;
-    xml += `          <Currency_code>${formatStr(item.invoiceCurrencyCode)}</Currency_code>\n`;
-    xml += `        </Item_Invoice>\n`;
+    xml += `        <Weight>\n`;
+    xml += t(10, 'Gross_weight_itm', n(item.grossWeight));
+    xml += t(10, 'Net_weight_itm', n(item.netWeight));
+    xml += `        </Weight>\n`;
+    xml += `        <Invoice>\n`;
+    xml += t(10, 'Amount_foreign_currency', n(item.invoiceAmount));
+    xml += t(10, 'Currency_code', s(item.invoiceCurrencyCode) || 'USD');
+    xml += `        </Invoice>\n`;
     xml += `      </Valuation_item>\n`;
+
+    // Field 44 — Attached documents
+    if (item.attachedDocuments && item.attachedDocuments.length > 0) {
+      xml += `      <Attached_documents>\n`;
+      item.attachedDocuments.forEach(doc => {
+        xml += `        <Attached_document>\n`;
+        xml += t(10, 'Attached_document_code', s(doc.documentCode));
+        xml += t(10, 'Attached_document_name', s(doc.documentName));
+        xml += t(10, 'Attached_document_reference', s(doc.referenceNumber));
+        if (doc.documentDate) {
+          xml += t(10, 'Attached_document_date', s(doc.documentDate));
+        }
+        xml += `        </Attached_document>\n`;
+      });
+      xml += `      </Attached_documents>\n`;
+    }
+
+    // Previous document (field 40)
+    xml += `      <Previous_document>\n`;
+    xml += t(8, 'Summary_declaration', s(item.previousDocumentSummaryDeclaration));
+    xml += t(8, 'Summary_declaration_sl', s(item.previousDocumentSummaryDeclarationSubline));
+    xml += `      </Previous_document>\n`;
 
     xml += `    </Item>\n`;
   });
+
   xml += `  </Items>\n`;
   xml += `</ASYCUDA>\n`;
 
