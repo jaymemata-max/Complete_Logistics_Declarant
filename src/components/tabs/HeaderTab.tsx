@@ -48,7 +48,7 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
   };
 
   return (
-    <div className="space-y-2 relative">
+    <div className="space-y-2" style={{position:'relative'}}>
       <Label>{label}</Label>
       <Input
         value={query}
@@ -62,7 +62,7 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
         </div>
       )}
       {open && results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 bg-card border rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+        <div style={{position:'absolute', top:'100%', left:0, right:0, zIndex:9999, maxHeight:'240px', overflowY:'auto', background:'white', border:'1px solid #e2e8f0', borderRadius:'8px', boxShadow:'0 4px 12px rgba(0,0,0,0.15)'}}>
           {results.map(item => (
             <div
               key={item.value}
