@@ -1,11 +1,8 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { Declaration, DeclarationHeader, DeclarationItem, DeclarationContainer, DeclarationVehicle } from '../types';
-import { PRESETS } from '../data/mockData';
-
 interface DeclarationContextType {
   declaration: Declaration | null;
   setDeclaration: (decl: Declaration | null) => void;
-  loadPreset: (presetName: string) => void;
   updateHeader: (updates: Partial<DeclarationHeader>) => void;
   addItem: () => void;
   updateItem: (id: string, updates: Partial<DeclarationItem>) => void;
@@ -32,21 +29,6 @@ export const useDeclaration = () => {
 
 export const DeclarationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [declaration, setDeclaration] = useState<Declaration | null>(null);
-
-  const loadPreset = (presetName: string) => {
-    const preset = PRESETS[presetName];
-    if (preset) {
-      setDeclaration({
-        id: Math.random().toString(36).substring(2, 9),
-        status: 'DRAFT',
-        shipmentType: preset.header?.shipmentType ?? 'LCL',
-        header: { ...preset.header } as DeclarationHeader,
-        items: preset.items ? [...preset.items] : [],
-        containers: preset.containers ? [...preset.containers] : [],
-        vehicles: [],
-      });
-    }
-  };
 
   const updateHeader = (updates: Partial<DeclarationHeader>) => {
     setDeclaration(prev => prev ? { ...prev, header: { ...prev.header, ...updates } } : null);
@@ -165,7 +147,6 @@ export const DeclarationProvider: React.FC<{ children: ReactNode }> = ({ childre
     <DeclarationContext.Provider value={{
       declaration,
       setDeclaration,
-      loadPreset,
       updateHeader,
       addItem,
       updateItem,
