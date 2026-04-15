@@ -1,4 +1,5 @@
 {
+  "exclude": ["sprint1_CL_Customs"],
   "compilerOptions": {
     "target": "ES2022",
     "experimentalDecorators": true,

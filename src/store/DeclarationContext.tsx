@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Declaration, DeclarationHeader, DeclarationItem, DeclarationContainer } from '../types';
+import { Declaration, DeclarationHeader, DeclarationItem, DeclarationContainer, DeclarationVehicle } from '../types';
 import { PRESETS } from '../data/mockData';
 
 interface DeclarationContextType {
@@ -14,6 +14,10 @@ interface DeclarationContextType {
   addContainer: () => void;
   updateContainer: (id: string, updates: Partial<DeclarationContainer>) => void;
   deleteContainer: (id: string) => void;
+  vehicles: DeclarationVehicle[];
+  addVehicle: (vehicle: DeclarationVehicle) => void;
+  updateVehicle: (id: string, updates: Partial<DeclarationVehicle>) => void;
+  deleteVehicle: (id: string) => void;
 }
 
 const DeclarationContext = createContext<DeclarationContextType | undefined>(undefined);
@@ -34,9 +38,12 @@ export const DeclarationProvider: React.FC<{ children: ReactNode }> = ({ childre
     if (preset) {
       setDeclaration({
         id: Math.random().toString(36).substring(2, 9),
+        status: 'DRAFT',
+        shipmentType: preset.header?.shipmentType ?? 'LCL',
         header: { ...preset.header } as DeclarationHeader,
         items: preset.items ? [...preset.items] : [],
         containers: preset.containers ? [...preset.containers] : [],
+        vehicles: [],
       });
     }
   };
@@ -66,10 +73,13 @@ export const DeclarationProvider: React.FC<{ children: ReactNode }> = ({ childre
         netWeight: 0,
         extendedCustomsProcedure: '',
         nationalCustomsProcedure: '',
+        preferenceCode: '',
         valuationMethodCode: '1',
+        quotaNumber: '',
         previousDocumentSummaryDeclaration: '',
         previousDocumentSummaryDeclarationSubline: '',
         supplementaryUnits: [],
+        attachedDocuments: [],
       };
       return { ...prev, items: [...prev.items, newItem] };
     });
@@ -117,10 +127,10 @@ export const DeclarationProvider: React.FC<{ children: ReactNode }> = ({ childre
       if (!prev) return null;
       const newContainer: DeclarationContainer = {
         id: Math.random().toString(36).substring(2, 9),
+        itemNumber: 0,
         containerNumber: '',
         containerType: '',
         emptyFullIndicator: 'F',
-        linkedItemNumbers: [],
         goodsDescription: '',
         packagesType: '',
         packagesNumber: 0,
@@ -147,6 +157,10 @@ export const DeclarationProvider: React.FC<{ children: ReactNode }> = ({ childre
     });
   };
 
+  const addVehicle = (_vehicle: DeclarationVehicle) => {};
+  const updateVehicle = (_id: string, _updates: Partial<DeclarationVehicle>) => {};
+  const deleteVehicle = (_id: string) => {};
+
   return (
     <DeclarationContext.Provider value={{
       declaration,
@@ -159,7 +173,11 @@ export const DeclarationProvider: React.FC<{ children: ReactNode }> = ({ childre
       duplicateItem,
       addContainer,
       updateContainer,
-      deleteContainer
+      deleteContainer,
+      vehicles: declaration?.vehicles ?? [],
+      addVehicle,
+      updateVehicle,
+      deleteVehicle,
     }}>
       {children}
     </DeclarationContext.Provider>

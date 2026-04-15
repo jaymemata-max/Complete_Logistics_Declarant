@@ -26,6 +26,8 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 
 export const PRESETS: Record<string, Partial<Declaration>> = {
   'LCL': {
+    status: 'DRAFT' as const,
+    vehicles: [],
     header: {
       declarationId: 'LCL-001',
       shipmentType: 'LCL',
@@ -46,6 +48,7 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
       destinationCountryCode: 'AW',
       containerFlag: false,
       locationOfGoods: 'GE-30',
+      locationOfGoodsAddress: '',
       transportIdentity: 'SHIP123',
       transportNationality: 'NL',
       borderTransportIdentity: 'SHIP123',
@@ -70,7 +73,7 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
       deductionAmount: 0,
       deductionCurrencyCode: 'USD',
       grossWeight: 500,
-      factor: 1,
+      calculationWorkingMode: 0 as const,
       splitsFlag: false,
     },
     items: [
@@ -92,15 +95,20 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
         netWeight: 450,
         extendedCustomsProcedure: '4000',
         nationalCustomsProcedure: '000',
+        preferenceCode: '',
         valuationMethodCode: '1',
+        quotaNumber: '',
         previousDocumentSummaryDeclaration: 'PREV-001',
         previousDocumentSummaryDeclarationSubline: '1',
         supplementaryUnits: [],
+        attachedDocuments: [],
       }
     ],
     containers: [],
   },
   'FCL': {
+    status: 'DRAFT' as const,
+    vehicles: [],
     header: {
       declarationId: 'FCL-001',
       shipmentType: 'FCL',
@@ -121,6 +129,7 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
       destinationCountryCode: 'AW',
       containerFlag: true,
       locationOfGoods: 'GE-30',
+      locationOfGoodsAddress: '',
       transportIdentity: 'SHIP456',
       transportNationality: 'PA',
       borderTransportIdentity: 'SHIP456',
@@ -145,7 +154,7 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
       deductionAmount: 0,
       deductionCurrencyCode: 'EUR',
       grossWeight: 15000,
-      factor: 1,
+      calculationWorkingMode: 0 as const,
       splitsFlag: false,
     },
     items: [
@@ -167,10 +176,13 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
         netWeight: 14000,
         extendedCustomsProcedure: '4000',
         nationalCustomsProcedure: '000',
+        preferenceCode: '',
         valuationMethodCode: '1',
+        quotaNumber: '',
         previousDocumentSummaryDeclaration: 'PREV-002',
         previousDocumentSummaryDeclarationSubline: '1',
         supplementaryUnits: [],
+        attachedDocuments: [],
       }
     ],
     containers: [
@@ -179,7 +191,7 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
         containerNumber: 'MSKU1234567',
         containerType: '40HC',
         emptyFullIndicator: 'F',
-        linkedItemNumbers: [1],
+        itemNumber: 1,
         goodsDescription: 'Wooden furniture',
         packagesType: 'PK',
         packagesNumber: 100,
@@ -188,6 +200,8 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
     ],
   },
   'Air': {
+    status: 'DRAFT' as const,
+    vehicles: [],
     header: {
       declarationId: 'AIR-001',
       shipmentType: 'Air',
@@ -208,6 +222,7 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
       destinationCountryCode: 'AW',
       containerFlag: false,
       locationOfGoods: 'RT-01',
+      locationOfGoodsAddress: '',
       transportIdentity: 'FLIGHT99',
       transportNationality: 'US',
       borderTransportIdentity: 'FLIGHT99',
@@ -232,7 +247,7 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
       deductionAmount: 0,
       deductionCurrencyCode: 'USD',
       grossWeight: 200,
-      factor: 1,
+      calculationWorkingMode: 0 as const,
       splitsFlag: false,
     },
     items: [
@@ -254,15 +269,20 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
         netWeight: 180,
         extendedCustomsProcedure: '4000',
         nationalCustomsProcedure: '000',
+        preferenceCode: '',
         valuationMethodCode: '1',
+        quotaNumber: '',
         previousDocumentSummaryDeclaration: 'AWB-123456',
         previousDocumentSummaryDeclarationSubline: '1',
         supplementaryUnits: [],
+        attachedDocuments: [],
       }
     ],
     containers: [],
   },
   'Alcohol': {
+    status: 'DRAFT' as const,
+    vehicles: [],
     header: {
       declarationId: 'ALC-001',
       shipmentType: 'Alcohol',
@@ -283,6 +303,7 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
       destinationCountryCode: 'AW',
       containerFlag: true,
       locationOfGoods: 'GE-30',
+      locationOfGoodsAddress: '',
       transportIdentity: 'SHIP789',
       transportNationality: 'NL',
       borderTransportIdentity: 'SHIP789',
@@ -307,7 +328,7 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
       deductionAmount: 0,
       deductionCurrencyCode: 'EUR',
       grossWeight: 8000,
-      factor: 1,
+      calculationWorkingMode: 0 as const,
       splitsFlag: false,
     },
     items: [
@@ -329,13 +350,16 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
         netWeight: 7500,
         extendedCustomsProcedure: '4000',
         nationalCustomsProcedure: '000',
+        preferenceCode: '',
         valuationMethodCode: '1',
+        quotaNumber: '',
         previousDocumentSummaryDeclaration: 'PREV-ALC',
         previousDocumentSummaryDeclarationSubline: '1',
         supplementaryUnits: [
           { id: generateId(), rank: 1, code: 'LTR', quantity: 5000 },
           { id: generateId(), rank: 2, code: 'XFL', quantity: 10000 }
         ],
+        attachedDocuments: [],
       }
     ],
     containers: [
@@ -344,7 +368,7 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
         containerNumber: 'BEER1234567',
         containerType: '20DC',
         emptyFullIndicator: 'F',
-        linkedItemNumbers: [1],
+        itemNumber: 1,
         goodsDescription: 'Beer',
         packagesType: 'CT',
         packagesNumber: 500,

@@ -155,13 +155,15 @@ create table if not exists templates (
   updated_at      timestamptz default now()
 );
 
-create type if not exists declaration_status as enum (
-  'DRAFT', 'SUBMITTED', 'REGISTERED', 'REJECTED'
-);
+do $$ begin
+  create type declaration_status as enum ('DRAFT', 'SUBMITTED', 'REGISTERED', 'REJECTED');
+exception when duplicate_object then null;
+end; $$;
 
-create type if not exists shipment_type as enum (
-  'LCL', 'FCL', 'Air', 'Alcohol'
-);
+do $$ begin
+  create type shipment_type as enum ('LCL', 'FCL', 'Air', 'Alcohol');
+exception when duplicate_object then null;
+end; $$;
 
 create table if not exists declarations (
   id                      uuid primary key default gen_random_uuid(),

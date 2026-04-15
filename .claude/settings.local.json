@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git --git-dir=\"/c/Users/jayme/Downloads/complete-logistics-declarant/.git\" --work-tree=\"/c/Users/jayme/Downloads/complete-logistics-declarant\" remote -v)",
+      "Bash(git --version)",
+      "Bash(GIT_DIR=\"/c/Users/jayme/Downloads/complete-logistics-declarant/.git\" GIT_WORK_TREE=\"/c/Users/jayme/Downloads/complete-logistics-declarant\" git status)",
+      "Bash(git config:*)",
+      "Bash(npm install:*)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Read(//c/Users/jayme/AppData/Roaming/**)",
+      "Read(//c/Users/jayme/AppData/Local/Programs//**)",
+      "Read(//c/Users/jayme/**)",
+      "Read(//c//**)",
+      "Bash(npm --version)",
+      "Bash(export PATH=\"$PATH:/c/Program Files/nodejs\")",
+      "Bash(node -e \"const pkg = require\\('./node_modules/@supabase/supabase-js/package.json'\\); console.log\\('supabase-js version:', pkg.version\\)\")",
+      "Bash(npx supabase:*)",
+      "Bash(export SUPABASE_ACCESS_TOKEN=sbp_184d4f07b1a29961041b02dfc80851c78120a2ec)",
+      "Bash(sed -n 5,268p C:/Users/jayme/Downloads/complete-logistics-declarant/sprint1_CL_Customs/sprint1/supabase/seeds/seed_data.sql)",
+      "Bash(sed -n 269,297p C:/Users/jayme/Downloads/complete-logistics-declarant/sprint1_CL_Customs/sprint1/supabase/seeds/seed_data.sql)",
+      "Bash(sed -n 298,316p C:/Users/jayme/Downloads/complete-logistics-declarant/sprint1_CL_Customs/sprint1/supabase/seeds/seed_data.sql)",
+      "Bash(sed -n 317,338p C:/Users/jayme/Downloads/complete-logistics-declarant/sprint1_CL_Customs/sprint1/supabase/seeds/seed_data.sql)",
+      "Bash(sed -n 339,351p C:/Users/jayme/Downloads/complete-logistics-declarant/sprint1_CL_Customs/sprint1/supabase/seeds/seed_data.sql)",
+      "Bash(npm run:*)",
+      "Bash(jobs -l)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}
