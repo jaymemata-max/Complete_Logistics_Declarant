@@ -6,7 +6,9 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Button } from '../ui/button';
 import { supabase } from '../../lib/supabase';
-import { Plus, Trash2, Copy, ChevronRight, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Copy, ChevronRight, ChevronDown, Upload } from 'lucide-react';
+import { ImportItemsModal } from '../ImportItemsModal';
+import type { DeclarationItem } from '../../types';
 
 // ── Commodity master search ───────────────────────────────────────────────────
 
@@ -87,8 +89,9 @@ const CommoditySearch: React.FC<SearchDropdownProps> = ({ value, onSelect }) => 
 // ── Main ItemsTab ─────────────────────────────────────────────────────────────
 
 export const ItemsTab: React.FC = () => {
-  const { declaration, addItem, updateItem, deleteItem, duplicateItem } = useDeclaration();
+  const { declaration, addItem, updateItem, deleteItem, duplicateItem, updateDeclaration } = useDeclaration();
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
   const [cpcCodes, setCpcCodes] = useState<{ code: string; extended: string; national: string; description: string }[]>([]);
   const [packageTypes, setPackageTypes] = useState<{ code: string; description: string }[]>([]);
   const [countries, setCountries] = useState<{ code: string; name: string }[]>([]);
@@ -162,10 +165,34 @@ export const ItemsTab: React.FC = () => {
           <h2 className="text-lg font-semibold">Declaration Items</h2>
           <p className="text-sm text-muted-foreground">{declaration.items.length} item{declaration.items.length !== 1 ? 's' : ''}</p>
         </div>
-        <Button onClick={addItem}>
-          <Plus className="h-4 w-4 mr-2" /> Add Item
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowImport(true)}>
+            <Upload className="h-4 w-4 mr-2" /> Import Items
+          </Button>
+          <Button onClick={addItem}>
+            <Plus className="h-4 w-4 mr-2" /> Add Item
+          </Button>
+        </div>
       </div>
+
+      {showImport && (
+        <ImportItemsModal
+          existingItemCount={declaration.items.length}
+          onImport={(newItems) => {
+            const startNumber = declaration.items.length + 1;
+            const itemsToAdd = newItems.map((item, i) => ({
+              ...item,
+              id: Math.random().toString(36).substring(2, 9),
+              itemNumber: startNumber + i,
+              supplementaryUnits: [],
+              attachedDocuments: [],
+            })) as DeclarationItem[];
+            updateDeclaration({ items: [...declaration.items, ...itemsToAdd] });
+            setShowImport(false);
+          }}
+          onClose={() => setShowImport(false)}
+        />
+      )}
 
       <div className="space-y-3">
         {declaration.items.map((item) => {

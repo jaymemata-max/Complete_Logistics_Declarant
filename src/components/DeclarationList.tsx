@@ -53,7 +53,11 @@ function blankDeclaration(template: Template): Declaration {
   };
 }
 
-export const DeclarationList: React.FC = () => {
+interface DeclarationListProps {
+  onOpenInvoices: () => void;
+}
+
+export const DeclarationList: React.FC<DeclarationListProps> = ({ onOpenInvoices }) => {
   const { setDeclaration } = useDeclaration();
   const [declarations, setDeclarations] = useState<DeclarationSummary[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -124,13 +128,23 @@ export const DeclarationList: React.FC = () => {
             <span className="font-medium text-secondary tracking-widest text-xs uppercase mt-1">Declarant</span>
           </div>
         </div>
-        <Button
-          size="sm"
-          className="bg-white text-primary hover:bg-gray-100 shadow-sm font-semibold"
-          onClick={() => setShowTemplates(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" /> New Declaration
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-primary-foreground/20 text-white bg-transparent hover:bg-primary-foreground/10"
+            onClick={onOpenInvoices}
+          >
+            Invoices
+          </Button>
+          <Button
+            size="sm"
+            className="bg-white text-primary hover:bg-gray-100 shadow-sm font-semibold"
+            onClick={() => setShowTemplates(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" /> New Declaration
+          </Button>
+        </div>
       </header>
 
       {/* Template picker modal */}

@@ -4,13 +4,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { ArrowLeft, Save, FileText, Package, LayoutGrid, FileCode2, SplitSquareHorizontal, BookTemplate, CheckCircle2, XCircle, Car } from 'lucide-react';
+import { ArrowLeft, Save, FileText, Package, LayoutGrid, FileCode2, SplitSquareHorizontal, BookTemplate, CheckCircle2, XCircle, Car, Receipt } from 'lucide-react';
 import { HeaderTab } from './tabs/HeaderTab';
 import { ItemsTab } from './tabs/ItemsTab';
 import { ContainersTab } from './tabs/ContainersTab';
 import { VehicleTab } from './tabs/VehicleTab';
 import { SplitTab } from './tabs/SplitTab';
 import { XmlPreviewTab } from './tabs/XmlPreviewTab';
+import { GenerateInvoiceModal } from './GenerateInvoiceModal';
 import { saveDeclaration, updateDeclarationStatus, saveTemplate } from '../lib/db';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -28,6 +29,7 @@ export const DeclarationWorkspace: React.FC = () => {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateCode, setTemplateCode] = useState('');
   const [templateDesc, setTemplateDesc] = useState('');
+  const [showInvoice, setShowInvoice] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
 
   if (!declaration) return null;
@@ -144,6 +146,22 @@ export const DeclarationWorkspace: React.FC = () => {
             >
               Save as Template
             </Button>
+          )}
+
+          {/* Generate Invoice */}
+          {!declaration.id.startsWith('local-') ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10 text-xs"
+              onClick={() => setShowInvoice(true)}
+            >
+              <Receipt className="h-4 w-4 mr-1" /> Generate Invoice
+            </Button>
+          ) : (
+            <span className="text-xs text-primary-foreground/50 px-2">
+              Save first to generate invoice
+            </span>
           )}
 
           {!isReadOnly && (
@@ -305,6 +323,17 @@ export const DeclarationWorkspace: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Generate Invoice modal */}
+      {showInvoice && !declaration.id.startsWith('local-') && (
+        <GenerateInvoiceModal
+          declarationId={declaration.id}
+          consigneeName={declaration.header.consigneeName}
+          declarationDisplay={declaration.header.declarationId}
+          onCreated={() => setShowInvoice(false)}
+          onClose={() => setShowInvoice(false)}
+        />
       )}
     </div>
   );

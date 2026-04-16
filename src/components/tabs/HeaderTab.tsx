@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDeclaration } from '../../store/DeclarationContext';
+import { FreightCalculatorModal } from '../FreightCalculatorModal';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -115,6 +116,7 @@ async function searchVessels(q: string) {
 
 export const HeaderTab: React.FC = () => {
   const { declaration, updateHeader } = useDeclaration();
+  const [showFreight, setShowFreight] = useState(false);
   const [countries, setCountries] = useState<{ code: string; name: string }[]>([]);
   const [offices, setOffices] = useState<{ code: string; place: string }[]>([]);
   const [locations, setLocations] = useState<{ code: string; place: string }[]>([]);
@@ -451,7 +453,6 @@ export const HeaderTab: React.FC = () => {
           <CardContent className="space-y-4">
             {[
               ['Invoice', 'invoiceAmount', 'invoiceCurrencyCode'],
-              ['External Freight', 'externalFreightAmount', 'externalFreightCurrencyCode'],
               ['Insurance', 'insuranceAmount', 'insuranceCurrencyCode'],
               ['Other Cost', 'otherCostAmount', 'otherCostCurrencyCode'],
               ['Deduction', 'deductionAmount', 'deductionCurrencyCode'],
@@ -476,6 +477,45 @@ export const HeaderTab: React.FC = () => {
                 </div>
               </div>
             ))}
+            {/* External Freight — with Calculate button */}
+            <div className="grid grid-cols-3 gap-2 items-end">
+              <div className="col-span-2 space-y-1">
+                <Label>External Freight</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    value={header.externalFreightAmount}
+                    onChange={e => h('externalFreightAmount', parseFloat(e.target.value) || 0)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowFreight(true)}
+                    className="text-xs px-2 py-1 rounded border border-primary text-primary hover:bg-primary/10 whitespace-nowrap"
+                  >
+                    Calculate
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Currency</Label>
+                <Input
+                  value={header.externalFreightCurrencyCode}
+                  onChange={e => h('externalFreightCurrencyCode', e.target.value.toUpperCase().slice(0, 3))}
+                  maxLength={3}
+                  placeholder="USD"
+                />
+              </div>
+            </div>
+            {showFreight && (
+              <FreightCalculatorModal
+                currentWeight={header.grossWeight}
+                onApply={(amount, currency) => {
+                  updateHeader({ externalFreightAmount: amount, externalFreightCurrencyCode: currency });
+                  setShowFreight(false);
+                }}
+                onClose={() => setShowFreight(false)}
+              />
+            )}
             <div className="space-y-2 pt-2 border-t">
               <Label>Gross Weight (kg)</Label>
               <Input type="number" value={header.grossWeight} onChange={e => h('grossWeight', parseFloat(e.target.value) || 0)} />
