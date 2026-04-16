@@ -55,6 +55,10 @@ export const InvoiceWorkspace: React.FC<Props> = ({ invoiceId, onBack, onDeleted
           <Button variant="ghost" size="icon" onClick={onBack} className="text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10">
             <ArrowLeft className="h-5 w-5" />
           </Button>
+          <div className="flex flex-col leading-none pr-4 border-r border-primary-foreground/20">
+            <span className="font-bold text-white tracking-tight text-lg">Complete Logistics</span>
+            <span className="text-secondary tracking-widest text-xs uppercase mt-1" style={{fontWeight: 900, letterSpacing: '0.15em'}}>DECLARANT</span>
+          </div>
           <div>
             <span className="font-bold text-white text-lg">Invoice</span>
             <span className="text-primary-foreground/70 ml-2 text-sm">{invoice.declarationDisplay}</span>

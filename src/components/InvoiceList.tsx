@@ -48,7 +48,7 @@ export const InvoiceList: React.FC<Props> = ({ onBack, onOpenInvoice }) => {
           </Button>
           <div className="flex flex-col leading-none">
             <span className="font-bold text-white tracking-tight text-xl">Complete Logistics</span>
-            <span className="font-medium text-secondary tracking-widest text-xs uppercase mt-1">Invoices</span>
+            <span className="text-secondary tracking-widest text-xs uppercase mt-1" style={{fontWeight: 900, letterSpacing: '0.15em'}}>DECLARANT</span>
           </div>
         </div>
       </header>

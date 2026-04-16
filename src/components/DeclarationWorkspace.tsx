@@ -99,12 +99,15 @@ export const DeclarationWorkspace: React.FC = () => {
       {/* Header */}
       <header className="px-6 py-4 flex items-center justify-between bg-primary text-primary-foreground z-10 shadow-md">
         <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 pr-6 border-r border-primary-foreground/20">
+          <button
+            className="flex items-center gap-2 pr-6 border-r border-primary-foreground/20 cursor-pointer bg-transparent border-0 p-0 text-left"
+            onClick={() => setDeclaration(null)}
+          >
             <div className="flex flex-col leading-none">
               <span className="font-bold text-white tracking-tight text-lg">Complete Logistics</span>
-              <span className="font-medium text-secondary tracking-widest text-xs uppercase mt-1">Declarant</span>
+              <span className="text-secondary tracking-widest text-xs uppercase mt-1" style={{fontWeight: 900, letterSpacing: '0.15em'}}>DECLARANT</span>
             </div>
-          </div>
+          </button>
           <Button
             variant="ghost"
             size="icon"
