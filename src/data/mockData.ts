@@ -31,7 +31,7 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
     header: {
       declarationId: 'LCL-001',
       shipmentType: 'LCL',
-      typeOfDeclaration: 'IM',
+      typeOfDeclaration: 'INV',
       generalProcedureCode: '4',
       manifestReferenceNumber: 'MAN-2023-001',
       totalNumberOfPackages: 10,
@@ -112,7 +112,7 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
     header: {
       declarationId: 'FCL-001',
       shipmentType: 'FCL',
-      typeOfDeclaration: 'IM',
+      typeOfDeclaration: 'INV',
       generalProcedureCode: '4',
       manifestReferenceNumber: 'MAN-2023-002',
       totalNumberOfPackages: 100,
@@ -205,7 +205,7 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
     header: {
       declarationId: 'AIR-001',
       shipmentType: 'Air',
-      typeOfDeclaration: 'IM',
+      typeOfDeclaration: 'INV',
       generalProcedureCode: '4',
       manifestReferenceNumber: 'AWB-123456',
       totalNumberOfPackages: 5,
@@ -286,7 +286,7 @@ export const PRESETS: Record<string, Partial<Declaration>> = {
     header: {
       declarationId: 'ALC-001',
       shipmentType: 'Alcohol',
-      typeOfDeclaration: 'IM',
+      typeOfDeclaration: 'INV',
       generalProcedureCode: '4',
       manifestReferenceNumber: 'MAN-ALC-001',
       totalNumberOfPackages: 500,

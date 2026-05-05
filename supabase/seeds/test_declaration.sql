@@ -106,7 +106,7 @@ insert into declaration_headers (
 ) values (
   'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
   'TEST-LCL-2026-001',         -- Aangifte nummer
-  'IM',                         -- Import declaration
+    'INV',                        -- Definitieve Invoer
   '4',                          -- General procedure code
   'HK02 2026 TEST001',          -- Manifest reference (office + year + number)
   332,                          -- Total packages

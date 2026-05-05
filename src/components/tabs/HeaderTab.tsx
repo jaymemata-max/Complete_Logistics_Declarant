@@ -8,6 +8,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { supabase } from '../../lib/supabase';
 import type { Importer, Vessel } from '../../types';
 
+interface DeclarationTypeOption {
+  code: string;
+  procedure_code: string;
+  description: string;
+}
+
+const FALLBACK_DECLARATION_TYPES: DeclarationTypeOption[] = [
+  { code: 'INV', procedure_code: '4', description: 'Definitieve Invoer' },
+  { code: 'INV', procedure_code: '5', description: 'Tijdelijke Invoer' },
+  { code: 'INV', procedure_code: '6', description: 'Wederinvoer' },
+  { code: 'INV', procedure_code: '7', description: 'Opslag' },
+  { code: 'IZM', procedure_code: '4', description: 'Definitieve Invoer (zonder manifest)' },
+  { code: 'IZM', procedure_code: '5', description: 'Tijdelijke Invoer (zonder manifest)' },
+  { code: 'IZM', procedure_code: '6', description: 'Wederinvoer (zonder manifest)' },
+  { code: 'IZM', procedure_code: '7', description: 'Opslag (zonder manifest)' },
+  { code: 'INP', procedure_code: '4', description: 'Passagiers Invoer' },
+  { code: 'AZ', procedure_code: '9', description: 'Aanvraag voor de verstrekking van accijnszegels' },
+  { code: 'NIL', procedure_code: '9', description: 'Aangifte met een Nul, waarde en hoeveelheid' },
+  { code: 'NL', procedure_code: '4', description: 'NL 302' },
+  { code: 'OP', procedure_code: '9', description: 'Overige Procedures' },
+  { code: 'UIT', procedure_code: '1', description: 'Definitieve Uitvoer' },
+  { code: 'UIT', procedure_code: '2', description: 'Tijdelijke Uitvoer' },
+];
+
 // ── Generic searchable dropdown ───────────────────────────────────────────────
 
 interface SearchDropdownProps {
@@ -124,10 +148,16 @@ export const HeaderTab: React.FC = () => {
   const [paymentAccounts, setPaymentAccounts] = useState<{ code: string; description: string }[]>([]);
   const [loadingPorts, setLoadingPorts] = useState<{ code: string; description: string }[]>([]);
   const [deliveryTerms, setDeliveryTerms] = useState<{ code: string; description: string }[]>([]);
+  const [declarationTypes, setDeclarationTypes] = useState<DeclarationTypeOption[]>(FALLBACK_DECLARATION_TYPES);
 
   useEffect(() => {
     // Load all small reference tables on mount
     Promise.all([
+      supabase.from('declaration_types').select('code, procedure_code, description').order('sort_order')
+        .then(r => {
+          console.log('declaration_types result:', { data: r.data?.length, error: r.error });
+          if (r.data?.length) setDeclarationTypes(r.data);
+        }),
       supabase.from('countries').select('code, name').order('code')
         .then(r => {
           console.log('countries result:', { data: r.data?.length, error: r.error });
@@ -166,6 +196,12 @@ export const HeaderTab: React.FC = () => {
   if (!declaration) return null;
   const { header } = declaration;
   const h = (field: keyof typeof header, value: any) => updateHeader({ [field]: value });
+  const declarationTypeValue = `${header.typeOfDeclaration}|${header.generalProcedureCode}`;
+
+  const updateDeclarationType = (value: string) => {
+    const [typeOfDeclaration, generalProcedureCode] = value.split('|');
+    updateHeader({ typeOfDeclaration, generalProcedureCode });
+  };
 
   return (
     <div className="space-y-6 pb-12">
@@ -181,17 +217,20 @@ export const HeaderTab: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Declaration Type</Label>
-                <Select value={header.typeOfDeclaration} onValueChange={v => h('typeOfDeclaration', v)}>
+                <Select value={declarationTypeValue} onValueChange={updateDeclarationType}>
                   <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="IM">IM - Import</SelectItem>
-                    <SelectItem value="EX">EX - Export</SelectItem>
+                    {declarationTypes.map(type => (
+                      <SelectItem key={`${type.code}-${type.procedure_code}`} value={`${type.code}|${type.procedure_code}`}>
+                        {type.code} {type.procedure_code} - {type.description}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Procedure Code</Label>
-                <Input value={header.generalProcedureCode} onChange={e => h('generalProcedureCode', e.target.value)} />
+                <Input value={header.generalProcedureCode} readOnly className="bg-muted/40" />
               </div>
             </div>
             <div className="space-y-2">
