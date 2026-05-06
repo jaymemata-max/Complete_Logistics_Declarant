@@ -12,8 +12,8 @@ import { Declaration } from '../types';
  * - <Border_information> now only <Mode> — VD never sends Identity/Nationality there
  * - <Valuation_method_code> removed — VD does not emit this
  * - <Description_of_goods> removed — VD does not emit this
- * - <Previous_document> FCL uses <Previous_document_reference>,
- *   LCL/Air/Alcohol use <Summary_declaration> + <Summary_declaration_sl>
+ * - <Previous_document> uses <Summary_declaration> + optional
+ *   <Summary_declaration_sl>, matching VD exports for Field 40
  */
 export function generateAsycudaXml(declaration: Declaration): string {
   const { header, items, containers } = declaration;
@@ -31,8 +31,6 @@ export function generateAsycudaXml(declaration: Declaration): string {
     `${' '.repeat(indent)}<${tag}>${content}</${tag}>\n`;
 
   const year = String(new Date().getFullYear());
-  const isFCL = header.shipmentType === 'FCL';
-
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
   xml += `<ASYCUDA>\n`;
   xml += `  <SAD id="60">\n`;
@@ -118,7 +116,6 @@ export function generateAsycudaXml(declaration: Declaration): string {
   // Financial — ASYCUDA spells "Deffered" with double 'f', intentional
   xml += `    <Financial>\n`;
   xml += t(6, 'Deffered_payment_reference', s(header.deferredPaymentReference));
-  xml += t(6, 'Mode_of_payment', s(header.deferredPaymentReference) ? 'KREDIET' : 'CONTANT');
   xml += `      <Financial_transaction>\n`;
   xml += t(8, 'Code_1', s(header.financialTransactionCode1));
   xml += t(8, 'Code_2', s(header.financialTransactionCode2));
@@ -252,16 +249,11 @@ export function generateAsycudaXml(declaration: Declaration): string {
     }
 
     // Previous document (Field 40)
-    // FCL/direct → <Previous_document_reference>
-    // LCL/Air/Alcohol → <Summary_declaration> + <Summary_declaration_sl>
+    // VD exports use Summary_declaration for all shipment types.
     xml += `      <Previous_document>\n`;
-    if (isFCL) {
-      xml += t(8, 'Previous_document_reference', s(item.previousDocumentSummaryDeclaration));
-    } else {
-      xml += t(8, 'Summary_declaration', s(item.previousDocumentSummaryDeclaration));
-      if (item.previousDocumentSummaryDeclarationSubline?.trim()) {
-        xml += t(8, 'Summary_declaration_sl', s(item.previousDocumentSummaryDeclarationSubline));
-      }
+    xml += t(8, 'Summary_declaration', s(item.previousDocumentSummaryDeclaration));
+    if (item.previousDocumentSummaryDeclarationSubline?.trim()) {
+      xml += t(8, 'Summary_declaration_sl', s(item.previousDocumentSummaryDeclarationSubline));
     }
     xml += `      </Previous_document>\n`;
 

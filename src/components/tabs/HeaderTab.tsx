@@ -32,6 +32,13 @@ const FALLBACK_DECLARATION_TYPES: DeclarationTypeOption[] = [
   { code: 'UIT', procedure_code: '2', description: 'Tijdelijke Uitvoer' },
 ];
 
+const FALLBACK_PAYMENT_ACCOUNTS = [
+  { code: 'MARICAR LOG. 33', description: 'Complete Logistics deferred account' },
+  { code: 'MARICAR LOG. 34', description: 'Complete Logistics deferred account' },
+];
+
+const LEGACY_PAYMENT_CODES = new Set(['CONTANT', 'KREDIET', 'NVT']);
+
 // ── Generic searchable dropdown ───────────────────────────────────────────────
 
 interface SearchDropdownProps {
@@ -145,7 +152,7 @@ export const HeaderTab: React.FC = () => {
   const [offices, setOffices] = useState<{ code: string; place: string }[]>([]);
   const [locations, setLocations] = useState<{ code: string; place: string }[]>([]);
   const [entrepots, setEntrepots] = useState<{ code: string; description: string }[]>([]);
-  const [paymentAccounts, setPaymentAccounts] = useState<{ code: string; description: string }[]>([]);
+  const [paymentAccounts, setPaymentAccounts] = useState<{ code: string; description: string }[]>(FALLBACK_PAYMENT_ACCOUNTS);
   const [loadingPorts, setLoadingPorts] = useState<{ code: string; description: string }[]>([]);
   const [deliveryTerms, setDeliveryTerms] = useState<{ code: string; description: string }[]>([]);
   const [declarationTypes, setDeclarationTypes] = useState<DeclarationTypeOption[]>(FALLBACK_DECLARATION_TYPES);
@@ -176,7 +183,8 @@ export const HeaderTab: React.FC = () => {
       supabase.from('payment_accounts').select('code, description').order('code')
         .then(r => {
           console.log('payment_accounts result:', { data: r.data?.length, error: r.error });
-          setPaymentAccounts(r.data || []);
+          const accounts = (r.data || []).filter(a => !LEGACY_PAYMENT_CODES.has(a.code));
+          setPaymentAccounts(accounts.length > 0 ? accounts : FALLBACK_PAYMENT_ACCOUNTS);
         }),
       supabase.from('delivery_terms').select('code, description').order('code')
         .then(r => {
@@ -561,14 +569,14 @@ export const HeaderTab: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Field 48 — Rekeninghoudernummer</Label>
+                <Label>Field 48 — Deferred payment account</Label>
                 <Select
                   value={header.deferredPaymentReference || '__CASH__'}
                   onValueChange={v => h('deferredPaymentReference', v === '__CASH__' ? '' : v)}
                 >
                   <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__CASH__">CONTANT — No credit account</SelectItem>
+                    <SelectItem value="__CASH__">CONTANT — leave Field 48 empty</SelectItem>
                     {paymentAccounts.map(a => (
                       <SelectItem key={a.code} value={a.code}>{a.code} — {a.description}</SelectItem>
                     ))}

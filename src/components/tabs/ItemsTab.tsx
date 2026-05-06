@@ -20,10 +20,29 @@ interface CommodityRecord {
   marks_1: string;
   package_code: string;
   supp_unit_code: string;
+  supp_unit_qty_1: number | null;
+  supp_unit_qty_2: number | null;
+  supp_unit_qty_3: number | null;
 }
 
 const digitsOnly = (value: string | undefined | null) => (value || '').replace(/\D/g, '');
 const hsCodeInputValue = (value: string) => value.replace(/[^\d.\s-]/g, '');
+
+const FALLBACK_ATTACHED_DOCUMENT_TYPES = [
+  { code: '001', description: 'Factuur' },
+  { code: '002', description: 'Vrachtbrief (bill of lading)' },
+  { code: '003', description: 'Vracht verzekeringsbewijs' },
+  { code: '004', description: 'Certificate of Title bij vervoermiddelen' },
+  { code: '018', description: 'Bewijs van oorsprong' },
+  { code: '019', description: 'Invoervergunning Economische Zaken' },
+  { code: '020', description: 'Invoervergunning Veterinaire Dienst' },
+  { code: '021', description: 'Invoervergunning Inspectie voor Geneesmiddelen' },
+  { code: '022', description: 'Invoervergunning Directie Telecommunicatiezaken' },
+  { code: '023', description: 'Paklijst' },
+  { code: '041', description: 'Garantie bewijs' },
+  { code: '050', description: 'Resultaat verificatie gedistilleerd' },
+  { code: '051', description: 'Analyse certificaat ethyl alcohol' },
+];
 
 interface SearchDropdownProps {
   value: string;
@@ -47,7 +66,7 @@ const CommoditySearch: React.FC<SearchDropdownProps> = ({ value, onSelect }) => 
       setLoading(true);
       const { data } = await supabase
         .from('commodity_master')
-        .select('keyword, hs_code, commercial_description, goods_description, marks_1, package_code, supp_unit_code')
+        .select('keyword, hs_code, commercial_description, goods_description, marks_1, package_code, supp_unit_code, supp_unit_qty_1, supp_unit_qty_2, supp_unit_qty_3')
         .or(`keyword.ilike.%${q}%,hs_code.ilike.%${q}%,commercial_description.ilike.%${q}%`)
         .limit(12);
       setResults(data || []);
@@ -98,26 +117,51 @@ export const ItemsTab: React.FC = () => {
   const [cpcCodes, setCpcCodes] = useState<{ code: string; extended: string; national: string; type: string; description: string }[]>([]);
   const [packageTypes, setPackageTypes] = useState<{ code: string; description: string }[]>([]);
   const [countries, setCountries] = useState<{ code: string; name: string }[]>([]);
+  const [documentTypes, setDocumentTypes] = useState<{ code: string; description: string }[]>(FALLBACK_ATTACHED_DOCUMENT_TYPES);
 
   useEffect(() => {
     Promise.all([
       supabase.from('cpc_codes').select('code, extended, national, type, description').order('code').then(r => setCpcCodes(r.data || [])),
       supabase.from('package_types').select('code, description').order('code').then(r => setPackageTypes(r.data || [])),
       supabase.from('countries').select('code, name').order('code').then(r => setCountries(r.data || [])),
+      supabase.from('attached_document_types').select('code, description').order('code').then(r => setDocumentTypes(r.data?.length ? r.data : FALLBACK_ATTACHED_DOCUMENT_TYPES)),
     ]);
   }, []);
 
   if (!declaration) return null;
 
+  const buildSupplementaryUnits = (record: CommodityRecord) => {
+    const code = (record.supp_unit_code || '').trim().toUpperCase();
+    if (!code) return [];
+
+    const quantity = Number(
+      record.supp_unit_qty_1 ?? record.supp_unit_qty_2 ?? record.supp_unit_qty_3 ?? 0
+    ) || 0;
+
+    return [{
+      id: Math.random().toString(36).substring(2, 9),
+      rank: 1,
+      code: code.slice(0, 3),
+      quantity,
+    }];
+  };
+
   const handleCommoditySelect = (itemId: string, record: CommodityRecord) => {
-    updateItem(itemId, {
+    const supplementaryUnits = buildSupplementaryUnits(record);
+    const updates: Partial<DeclarationItem> = {
       tradeNameSearch: record.keyword,
       hsCode: digitsOnly(record.hs_code),
       commercialDescription: record.commercial_description,
       descriptionOfGoods: record.goods_description,
       marks1: record.marks_1 || '',
       kindOfPackagesCode: record.package_code || '',
-    });
+    };
+
+    if (supplementaryUnits.length > 0) {
+      updates.supplementaryUnits = supplementaryUnits;
+    }
+
+    updateItem(itemId, updates);
   };
 
   const handleCpcSelect = (itemId: string, cpcCode: string) => {
@@ -152,6 +196,16 @@ export const ItemsTab: React.FC = () => {
     updateItem(itemId, { attachedDocuments: updated });
   };
 
+  const updateDocCode = (itemId: string, docs: any[], idx: number, val: string) => {
+    const code = val.toUpperCase().slice(0, 4);
+    const match = documentTypes.find(d => d.code === code);
+    const updated = docs.map((d, i) => i === idx
+      ? { ...d, documentCode: code, ...(match ? { documentName: match.description } : {}) }
+      : d
+    );
+    updateItem(itemId, { attachedDocuments: updated });
+  };
+
   const removeDoc = (itemId: string, docs: any[], docId: string) => {
     updateItem(itemId, { attachedDocuments: docs.filter(d => d.id !== docId) });
   };
@@ -165,6 +219,12 @@ export const ItemsTab: React.FC = () => {
 
   return (
     <div className="space-y-4 pb-12">
+      <datalist id="attached-document-types">
+        {documentTypes.map(d => (
+          <option key={d.code} value={d.code}>{d.description}</option>
+        ))}
+      </datalist>
+
       <div className="flex justify-between items-center bg-card p-4 rounded-xl border shadow-sm">
         <div>
           <h2 className="text-lg font-semibold">Declaration Items</h2>
@@ -512,9 +572,10 @@ export const ItemsTab: React.FC = () => {
                             <div className="col-span-1">
                               <Input
                                 value={doc.documentCode}
+                                list="attached-document-types"
                                 maxLength={4}
-                                onChange={e => updateDoc(item.id, item.attachedDocuments, idx, 'documentCode', e.target.value.toUpperCase())}
-                                placeholder="INV"
+                                onChange={e => updateDocCode(item.id, item.attachedDocuments, idx, e.target.value)}
+                                placeholder="001"
                               />
                             </div>
                             <div className="col-span-4">

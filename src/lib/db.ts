@@ -203,7 +203,7 @@ export async function loadDeclaration(id: string): Promise<Declaration | null> {
   return {
     id: d.id,
     status: d.status,
-    shipmentType: d.ship_type,
+    shipmentType: d.shipment_type,
     createdAt: d.created_at,
     updatedAt: d.updated_at,
     submittedAt: d.submitted_at,

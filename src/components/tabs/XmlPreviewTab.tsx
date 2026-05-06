@@ -5,6 +5,22 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui
 import { Button } from '../ui/button';
 import { Copy, Download, Check, AlertTriangle } from 'lucide-react';
 
+const requiresVehicleInfo = (hsCode: string) => {
+  const hs = hsCode.replace(/\D/g, '');
+  return hs.startsWith('8426')
+    || hs.startsWith('8427')
+    || hs.startsWith('8429')
+    || hs.startsWith('8430')
+    || hs.startsWith('8432')
+    || hs.startsWith('86')
+    || /^870[1-6]/.test(hs)
+    || hs.startsWith('8709')
+    || hs.startsWith('8710')
+    || hs.startsWith('8711')
+    || hs.startsWith('8713')
+    || /^890[1-8]/.test(hs);
+};
+
 export const XmlPreviewTab: React.FC = () => {
   const { declaration } = useDeclaration();
   const [xmlContent, setXmlContent] = useState('');
@@ -18,7 +34,7 @@ export const XmlPreviewTab: React.FC = () => {
       
       // Basic validation
       const newWarnings: string[] = [];
-      const { header, items, containers } = declaration;
+      const { header, items, containers, vehicles } = declaration;
 
       // Header Validation
       if (!header.typeOfDeclaration) newWarnings.push('Header: Missing Type of Declaration');
@@ -51,6 +67,7 @@ export const XmlPreviewTab: React.FC = () => {
         if (!normalizedHsCode) newWarnings.push(`Item ${item.itemNumber}: Missing HS Code`);
         if (item.hsCode && /[^\d.\s-]/.test(item.hsCode)) newWarnings.push(`Item ${item.itemNumber}: HS Code can only use digits, dots, spaces, or hyphens`);
         if (!item.previousDocumentSummaryDeclaration) newWarnings.push(`Item ${item.itemNumber}: Missing Previous Document`);
+        if (header.splitsFlag && !item.previousDocumentSummaryDeclarationSubline) newWarnings.push(`Item ${item.itemNumber}: Missing Field 40 S/L for split shipment`);
         if (!item.commercialDescription) newWarnings.push(`Item ${item.itemNumber}: Missing Commercial Description`);
         if (!item.descriptionOfGoods) newWarnings.push(`Item ${item.itemNumber}: Missing Description of Goods`);
         if (!item.countryOfOriginCode) newWarnings.push(`Item ${item.itemNumber}: Missing Country of Origin Code`);
@@ -62,6 +79,12 @@ export const XmlPreviewTab: React.FC = () => {
         if (!item.invoiceAmount || item.invoiceAmount <= 0) newWarnings.push(`Item ${item.itemNumber}: Invoice Amount must be greater than 0`);
         if (!item.extendedCustomsProcedure) newWarnings.push(`Item ${item.itemNumber}: Missing Extended Customs Procedure`);
         if (!item.nationalCustomsProcedure) newWarnings.push(`Item ${item.itemNumber}: Missing National Customs Procedure`);
+        if (requiresVehicleInfo(item.hsCode)) {
+          const linkedVehicle = vehicles.find(v => v.itemId === item.id);
+          const hasSupplementaryUnitQuantity = item.supplementaryUnits?.some(su => su.quantity > 0);
+          if (!linkedVehicle) newWarnings.push(`Item ${item.itemNumber}: Vehicle information required for this HS code`);
+          if (!hasSupplementaryUnitQuantity) newWarnings.push(`Item ${item.itemNumber}: Field 41 supplementary unit quantity required for vehicle goods`);
+        }
 
         totalItemPackages += item.numberOfPackages || 0;
         totalItemGrossWeight += item.grossWeight || 0;
