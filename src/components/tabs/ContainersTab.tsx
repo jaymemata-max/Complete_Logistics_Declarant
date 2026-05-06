@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDeclaration } from '../../store/DeclarationContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Input } from '../ui/input';
@@ -6,12 +6,55 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Button } from '../ui/button';
 import { Plus, Trash2 } from 'lucide-react';
-import { MOCK_PACKAGE_TYPES } from '../../data/mockData';
+import { supabase } from '../../lib/supabase';
+
+const describeItem = (item: any) =>
+  item?.descriptionOfGoods || item?.commercialDescription || item?.tradeNameSearch || '';
 
 export const ContainersTab: React.FC = () => {
-  const { declaration, addContainer, updateContainer, deleteContainer } = useDeclaration();
+  const { declaration, addContainer, updateContainer, deleteContainer, updateDeclaration } = useDeclaration();
+  const [packageTypes, setPackageTypes] = useState<{ code: string; description: string }[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from('package_types')
+      .select('code, description')
+      .order('code')
+      .then(r => setPackageTypes(r.data || []));
+  }, []);
 
   if (!declaration) return null;
+
+  const buildContainerFromItem = (item: any) => ({
+    id: Math.random().toString(36).substring(2, 9),
+    itemNumber: item?.itemNumber || 0,
+    containerNumber: '',
+    containerType: '',
+    emptyFullIndicator: 'F',
+    goodsDescription: describeItem(item),
+    packagesType: item?.kindOfPackagesCode || '',
+    packagesNumber: item?.numberOfPackages || 0,
+    packagesWeight: item?.grossWeight || 0,
+  });
+
+  const handleAddContainer = () => {
+    if (declaration.items.length === 1) {
+      updateDeclaration({ containers: [...declaration.containers, buildContainerFromItem(declaration.items[0])] });
+      return;
+    }
+    addContainer();
+  };
+
+  const handleItemLink = (containerId: string, itemNumber: number) => {
+    const item = declaration.items.find(i => i.itemNumber === itemNumber);
+    updateContainer(containerId, {
+      itemNumber,
+      goodsDescription: describeItem(item),
+      packagesType: item?.kindOfPackagesCode || '',
+      packagesNumber: item?.numberOfPackages || 0,
+      packagesWeight: item?.grossWeight || 0,
+    });
+  };
 
   return (
     <div className="space-y-4 pb-12">
@@ -20,7 +63,7 @@ export const ContainersTab: React.FC = () => {
           <h2 className="text-lg font-semibold">Containers</h2>
           <p className="text-sm text-muted-foreground">Manage shipping containers for this FCL declaration</p>
         </div>
-        <Button onClick={addContainer}>
+        <Button onClick={handleAddContainer}>
           <Plus className="h-4 w-4 mr-2" /> Add Container
         </Button>
       </div>
@@ -77,7 +120,7 @@ export const ContainersTab: React.FC = () => {
                   <Label>Item Number</Label>
                   <Select
                     value={container.itemNumber ? String(container.itemNumber) : '0'}
-                    onValueChange={(v) => updateContainer(container.id, { itemNumber: parseInt(v) || 0 })}
+                    onValueChange={(v) => handleItemLink(container.id, parseInt(v) || 0)}
                   >
                     <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
                     <SelectContent>
@@ -89,7 +132,7 @@ export const ContainersTab: React.FC = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">Container link used in XML container item number.</p>
+                  <p className="text-xs text-muted-foreground">Auto-fills goods and package details from the item; edit below if needed.</p>
                 </div>
               </div>
 
@@ -99,7 +142,9 @@ export const ContainersTab: React.FC = () => {
                   <Select value={container.packagesType} onValueChange={(v) => updateContainer(container.id, { packagesType: v })}>
                     <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                     <SelectContent>
-                      {MOCK_PACKAGE_TYPES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                      {packageTypes.map(p => (
+                        <SelectItem key={p.code} value={p.code}>{p.code} — {p.description}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -119,7 +164,7 @@ export const ContainersTab: React.FC = () => {
         {declaration.containers.length === 0 && (
           <div className="text-center p-12 border rounded-xl bg-card border-dashed">
             <p className="text-muted-foreground">No containers added yet.</p>
-            <Button variant="outline" className="mt-4" onClick={addContainer}>
+            <Button variant="outline" className="mt-4" onClick={handleAddContainer}>
               <Plus className="h-4 w-4 mr-2" /> Add First Container
             </Button>
           </div>
