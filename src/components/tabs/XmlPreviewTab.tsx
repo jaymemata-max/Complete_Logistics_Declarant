@@ -48,6 +48,7 @@ export const XmlPreviewTab: React.FC = () => {
       // Item Validation
       items.forEach(item => {
         if (!item.hsCode) newWarnings.push(`Item ${item.itemNumber}: Missing HS Code`);
+        if (item.hsCode && !/^\d+$/.test(item.hsCode)) newWarnings.push(`Item ${item.itemNumber}: HS Code must contain digits only`);
         if (!item.previousDocumentSummaryDeclaration) newWarnings.push(`Item ${item.itemNumber}: Missing Previous Document`);
         if (!item.commercialDescription) newWarnings.push(`Item ${item.itemNumber}: Missing Commercial Description`);
         if (!item.descriptionOfGoods) newWarnings.push(`Item ${item.itemNumber}: Missing Description of Goods`);
@@ -110,7 +111,13 @@ export const XmlPreviewTab: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `declaration_${declaration?.header.declarationId || 'new'}.xml`;
+    const rawName = declaration?.header.declarationId
+      || declaration?.header.referenceNumber
+      || declaration?.customsReferenceNumber
+      || declaration?.id
+      || `draft-${new Date().toISOString().slice(0, 10)}`;
+    const fileName = rawName.replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'declaration';
+    a.download = `${fileName}.xml`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

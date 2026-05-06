@@ -562,10 +562,13 @@ export const HeaderTab: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Field 48 — Rekeninghoudernummer</Label>
-                <Select value={header.deferredPaymentReference} onValueChange={v => h('deferredPaymentReference', v)}>
+                <Select
+                  value={header.deferredPaymentReference || '__CASH__'}
+                  onValueChange={v => h('deferredPaymentReference', v === '__CASH__' ? '' : v)}
+                >
                   <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">— None —</SelectItem>
+                    <SelectItem value="__CASH__">CONTANT — No credit account</SelectItem>
                     {paymentAccounts.map(a => (
                       <SelectItem key={a.code} value={a.code}>{a.code} — {a.description}</SelectItem>
                     ))}
@@ -574,25 +577,18 @@ export const HeaderTab: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <Label>Field 49 — Identificatie entrepot</Label>
-                <Select value={header.warehouseIdentification} onValueChange={v => h('warehouseIdentification', v)}>
+                <Select
+                  value={header.warehouseIdentification || '__NONE__'}
+                  onValueChange={v => h('warehouseIdentification', v === '__NONE__' ? '' : v)}
+                >
                   <SelectTrigger><SelectValue placeholder="Select entrepot" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">— None —</SelectItem>
+                    <SelectItem value="__NONE__">— None —</SelectItem>
                     {entrepots.map(e => (
                       <SelectItem key={e.code} value={e.code}>{e.code} — {e.description}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Financial Transaction Code 1</Label>
-                <Input value={header.financialTransactionCode1} onChange={e => h('financialTransactionCode1', e.target.value)} maxLength={1} />
-              </div>
-              <div className="space-y-2">
-                <Label>Financial Transaction Code 2</Label>
-                <Input value={header.financialTransactionCode2} onChange={e => h('financialTransactionCode2', e.target.value)} maxLength={1} />
               </div>
             </div>
           </CardContent>

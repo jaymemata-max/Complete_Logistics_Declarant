@@ -22,6 +22,8 @@ interface CommodityRecord {
   supp_unit_code: string;
 }
 
+const digitsOnly = (value: string | undefined | null) => (value || '').replace(/\D/g, '');
+
 interface SearchDropdownProps {
   value: string;
   onSelect: (record: CommodityRecord) => void;
@@ -92,13 +94,13 @@ export const ItemsTab: React.FC = () => {
   const { declaration, addItem, updateItem, deleteItem, duplicateItem, updateDeclaration } = useDeclaration();
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
-  const [cpcCodes, setCpcCodes] = useState<{ code: string; extended: string; national: string; description: string }[]>([]);
+  const [cpcCodes, setCpcCodes] = useState<{ code: string; extended: string; national: string; type: string; description: string }[]>([]);
   const [packageTypes, setPackageTypes] = useState<{ code: string; description: string }[]>([]);
   const [countries, setCountries] = useState<{ code: string; name: string }[]>([]);
 
   useEffect(() => {
     Promise.all([
-      supabase.from('cpc_codes').select('code, extended, national, description').order('code').then(r => setCpcCodes(r.data || [])),
+      supabase.from('cpc_codes').select('code, extended, national, type, description').order('code').then(r => setCpcCodes(r.data || [])),
       supabase.from('package_types').select('code, description').order('code').then(r => setPackageTypes(r.data || [])),
       supabase.from('countries').select('code, name').order('code').then(r => setCountries(r.data || [])),
     ]);
@@ -109,7 +111,7 @@ export const ItemsTab: React.FC = () => {
   const handleCommoditySelect = (itemId: string, record: CommodityRecord) => {
     updateItem(itemId, {
       tradeNameSearch: record.keyword,
-      hsCode: record.hs_code,
+      hsCode: digitsOnly(record.hs_code),
       commercialDescription: record.commercial_description,
       descriptionOfGoods: record.goods_description,
       marks1: record.marks_1 || '',
@@ -157,6 +159,8 @@ export const ItemsTab: React.FC = () => {
     item.extendedCustomsProcedure && item.nationalCustomsProcedure
       ? `${item.extendedCustomsProcedure}-${item.nationalCustomsProcedure}`
       : '';
+  const declarationCpcType = `${declaration.header.typeOfDeclaration}${declaration.header.generalProcedureCode}`;
+  const visibleCpcCodes = cpcCodes.filter(c => !c.type || c.type === declarationCpcType);
 
   return (
     <div className="space-y-4 pb-12">
@@ -258,8 +262,9 @@ export const ItemsTab: React.FC = () => {
                           <Label>HS Code (Field 33)</Label>
                           <Input
                             value={item.hsCode}
-                            onChange={e => updateItem(item.id, { hsCode: e.target.value })}
+                            onChange={e => updateItem(item.id, { hsCode: digitsOnly(e.target.value) })}
                             placeholder="e.g. 84714100"
+                            inputMode="numeric"
                           />
                         </div>
                         <div className="space-y-2">
@@ -267,7 +272,7 @@ export const ItemsTab: React.FC = () => {
                           <Select value={cpcValue(item)} onValueChange={v => handleCpcSelect(item.id, v)}>
                             <SelectTrigger><SelectValue placeholder="Select CPC" /></SelectTrigger>
                             <SelectContent>
-                              {cpcCodes.map(c => (
+                              {(visibleCpcCodes.length > 0 ? visibleCpcCodes : cpcCodes).map(c => (
                                 <SelectItem key={c.code} value={c.code}>
                                   {c.code} — {c.description?.substring(0, 50)}
                                 </SelectItem>
@@ -293,28 +298,6 @@ export const ItemsTab: React.FC = () => {
                           onChange={e => updateItem(item.id, { descriptionOfGoods: e.target.value })}
                           maxLength={88}
                         />
-                      </div>
-
-                      {/* Field 36 + 39 */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label>Field 36 — Prefer.</Label>
-                          <Input
-                            value={item.preferenceCode || ''}
-                            onChange={e => updateItem(item.id, { preferenceCode: e.target.value })}
-                            placeholder="Preference code"
-                            maxLength={17}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Field 39 — Contingent</Label>
-                          <Input
-                            value={item.quotaNumber || ''}
-                            onChange={e => updateItem(item.id, { quotaNumber: e.target.value })}
-                            placeholder="Quota reference"
-                            maxLength={17}
-                          />
-                        </div>
                       </div>
                     </div>
 
@@ -394,7 +377,7 @@ export const ItemsTab: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 gap-3">
                         <div className="space-y-2">
                           <Label>Origin Country (Field 34)</Label>
                           <Select value={item.countryOfOriginCode} onValueChange={v => updateItem(item.id, { countryOfOriginCode: v })}>
@@ -403,23 +386,6 @@ export const ItemsTab: React.FC = () => {
                               {countries.map(c => (
                                 <SelectItem key={c.code} value={c.code}>{c.code} — {c.name}</SelectItem>
                               ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>W.M. Code (Field 43)</Label>
-                          <Select
-                            value={item.valuationMethodCode || '1'}
-                            onValueChange={v => updateItem(item.id, { valuationMethodCode: v })}
-                          >
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="1">1 — Transaction value</SelectItem>
-                              <SelectItem value="2">2 — Identical goods</SelectItem>
-                              <SelectItem value="3">3 — Similar goods</SelectItem>
-                              <SelectItem value="4">4 — Deductive</SelectItem>
-                              <SelectItem value="5">5 — Computed</SelectItem>
-                              <SelectItem value="6">6 — Fall-back</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -445,12 +411,12 @@ export const ItemsTab: React.FC = () => {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>S/L (subline)</Label>
+                          <Label>S/L (subline, optional)</Label>
                           <Input
                             value={item.previousDocumentSummaryDeclarationSubline}
                             onChange={e => updateItem(item.id, { previousDocumentSummaryDeclarationSubline: e.target.value })}
                             maxLength={4}
-                            placeholder="1"
+                            placeholder="Optional"
                           />
                         </div>
                       </div>

@@ -24,6 +24,9 @@ export function generateAsycudaXml(declaration: Declaration): string {
   const n = (val: number | undefined | null): string =>
     val !== undefined && val !== null ? val.toFixed(2) : '0.00';
 
+  const digitsOnly = (val: string | undefined | null): string =>
+    s(val).replace(/\D/g, '');
+
   const t = (indent: number, tag: string, content: string): string =>
     `${' '.repeat(indent)}<${tag}>${content}</${tag}>\n`;
 
@@ -115,6 +118,7 @@ export function generateAsycudaXml(declaration: Declaration): string {
   // Financial — ASYCUDA spells "Deffered" with double 'f', intentional
   xml += `    <Financial>\n`;
   xml += t(6, 'Deffered_payment_reference', s(header.deferredPaymentReference));
+  xml += t(6, 'Mode_of_payment', s(header.deferredPaymentReference) ? 'KREDIET' : 'CONTANT');
   xml += `      <Financial_transaction>\n`;
   xml += t(8, 'Code_1', s(header.financialTransactionCode1));
   xml += t(8, 'Code_2', s(header.financialTransactionCode2));
@@ -197,7 +201,7 @@ export function generateAsycudaXml(declaration: Declaration): string {
       xml += t(8, 'Preference_code', s(item.preferenceCode));
     }
     xml += `        <Harmonized_system>\n`;
-    xml += t(10, 'Commodity_code', s(item.hsCode));
+    xml += t(10, 'Commodity_code', digitsOnly(item.hsCode));
     xml += `        </Harmonized_system>\n`;
     if (item.supplementaryUnits && item.supplementaryUnits.length > 0) {
       item.supplementaryUnits.forEach(su => {
@@ -255,7 +259,9 @@ export function generateAsycudaXml(declaration: Declaration): string {
       xml += t(8, 'Previous_document_reference', s(item.previousDocumentSummaryDeclaration));
     } else {
       xml += t(8, 'Summary_declaration', s(item.previousDocumentSummaryDeclaration));
-      xml += t(8, 'Summary_declaration_sl', s(item.previousDocumentSummaryDeclarationSubline));
+      if (item.previousDocumentSummaryDeclarationSubline?.trim()) {
+        xml += t(8, 'Summary_declaration_sl', s(item.previousDocumentSummaryDeclarationSubline));
+      }
     }
     xml += `      </Previous_document>\n`;
 

@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 import type { Declaration, DeclarationHeader, DeclarationItem, DeclarationContainer, Template } from '../types';
 
+const digitsOnly = (value: string | undefined | null) => (value || '').replace(/\D/g, '');
+
 // ─────────────────────────────────────────────────────────────
 // Types for list view (lightweight, no full item data)
 // ─────────────────────────────────────────────────────────────
@@ -324,7 +326,7 @@ export async function saveDeclaration(declaration: Declaration): Promise<string 
         declaration_id: declId,
         item_number: item.itemNumber,
         trade_name_search: item.tradeNameSearch,
-        hs_code: item.hsCode,
+        hs_code: digitsOnly(item.hsCode),
         commercial_description: item.commercialDescription,
         description_of_goods: item.descriptionOfGoods,
         country_of_origin_code: item.countryOfOriginCode,
@@ -342,7 +344,7 @@ export async function saveDeclaration(declaration: Declaration): Promise<string 
         valuation_method_code: item.valuationMethodCode,
         quota_number: item.quotaNumber,
         previous_document_summary_declaration: item.previousDocumentSummaryDeclaration,
-        previous_document_summary_declaration_sl: item.previousDocumentSummaryDeclarationSubline,
+        previous_document_summary_declaration_sl: item.previousDocumentSummaryDeclarationSubline || null,
       })
       .select('id')
       .single();

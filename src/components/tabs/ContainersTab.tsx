@@ -74,16 +74,22 @@ export const ContainersTab: React.FC = () => {
                   <Input value={container.goodsDescription} onChange={(e) => updateContainer(container.id, { goodsDescription: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Linked Item Numbers</Label>
-                  <Input 
-                    placeholder="e.g. 1, 2, 3" 
-                    value={container.linkedItemNumbers.join(', ')} 
-                    onChange={(e) => {
-                      const nums = e.target.value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-                      updateContainer(container.id, { linkedItemNumbers: nums });
-                    }} 
-                  />
-                  <p className="text-xs text-muted-foreground">Comma separated item numbers</p>
+                  <Label>Item Number</Label>
+                  <Select
+                    value={container.itemNumber ? String(container.itemNumber) : '0'}
+                    onValueChange={(v) => updateContainer(container.id, { itemNumber: parseInt(v) || 0 })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">— Not linked —</SelectItem>
+                      {declaration.items.map(item => (
+                        <SelectItem key={item.id} value={String(item.itemNumber)}>
+                          Item {item.itemNumber} — {item.tradeNameSearch || item.commercialDescription || 'No description'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Container link used in XML container item number.</p>
                 </div>
               </div>
 

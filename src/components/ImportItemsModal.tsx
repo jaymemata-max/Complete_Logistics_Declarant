@@ -97,6 +97,8 @@ function buildItem(row: string[], mapping: string[], existingCount: number): Par
     const val = row[colIdx];
     if (['numberOfPackages', 'grossWeight', 'netWeight', 'invoiceAmount'].includes(field)) {
       item[field] = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
+    } else if (field === 'hsCode') {
+      item[field] = val.replace(/\D/g, '');
     } else {
       item[field] = val;
     }
