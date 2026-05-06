@@ -47,8 +47,9 @@ export const XmlPreviewTab: React.FC = () => {
 
       // Item Validation
       items.forEach(item => {
-        if (!item.hsCode) newWarnings.push(`Item ${item.itemNumber}: Missing HS Code`);
-        if (item.hsCode && !/^\d+$/.test(item.hsCode)) newWarnings.push(`Item ${item.itemNumber}: HS Code must contain digits only`);
+        const normalizedHsCode = item.hsCode.replace(/\D/g, '');
+        if (!normalizedHsCode) newWarnings.push(`Item ${item.itemNumber}: Missing HS Code`);
+        if (item.hsCode && /[^\d.\s-]/.test(item.hsCode)) newWarnings.push(`Item ${item.itemNumber}: HS Code can only use digits, dots, spaces, or hyphens`);
         if (!item.previousDocumentSummaryDeclaration) newWarnings.push(`Item ${item.itemNumber}: Missing Previous Document`);
         if (!item.commercialDescription) newWarnings.push(`Item ${item.itemNumber}: Missing Commercial Description`);
         if (!item.descriptionOfGoods) newWarnings.push(`Item ${item.itemNumber}: Missing Description of Goods`);

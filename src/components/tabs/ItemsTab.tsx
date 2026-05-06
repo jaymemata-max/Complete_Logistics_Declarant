@@ -23,6 +23,7 @@ interface CommodityRecord {
 }
 
 const digitsOnly = (value: string | undefined | null) => (value || '').replace(/\D/g, '');
+const hsCodeInputValue = (value: string) => value.replace(/[^\d.\s-]/g, '');
 
 interface SearchDropdownProps {
   value: string;
@@ -262,9 +263,9 @@ export const ItemsTab: React.FC = () => {
                           <Label>HS Code (Field 33)</Label>
                           <Input
                             value={item.hsCode}
-                            onChange={e => updateItem(item.id, { hsCode: digitsOnly(e.target.value) })}
-                            placeholder="e.g. 84714100"
-                            inputMode="numeric"
+                            onChange={e => updateItem(item.id, { hsCode: hsCodeInputValue(e.target.value) })}
+                            placeholder="e.g. 8471.41.00"
+                            inputMode="text"
                           />
                         </div>
                         <div className="space-y-2">
