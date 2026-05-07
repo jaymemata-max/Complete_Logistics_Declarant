@@ -1,4 +1,5 @@
 import { Declaration } from '../types';
+import { normalizeDeferredPaymentReference } from './declarationRules';
 
 /**
  * Generates ASYCUDA SAD XML matching the format accepted by Aruba Customs.
@@ -16,7 +17,7 @@ import { Declaration } from '../types';
  *   <Summary_declaration_sl>, matching VD exports for Field 40
  */
 export function generateAsycudaXml(declaration: Declaration): string {
-  const { header, items, containers } = declaration;
+  const { header, items, containers, vehicles } = declaration;
 
   const s = (val: string | undefined | null): string =>
     (val || '').trim();
@@ -31,6 +32,7 @@ export function generateAsycudaXml(declaration: Declaration): string {
     `${' '.repeat(indent)}<${tag}>${content}</${tag}>\n`;
 
   const year = String(new Date().getFullYear());
+  const deferredPaymentReference = normalizeDeferredPaymentReference(header.deferredPaymentReference);
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
   xml += `<ASYCUDA>\n`;
   xml += `  <SAD id="60">\n`;
@@ -115,7 +117,7 @@ export function generateAsycudaXml(declaration: Declaration): string {
 
   // Financial — ASYCUDA spells "Deffered" with double 'f', intentional
   xml += `    <Financial>\n`;
-  xml += t(6, 'Deffered_payment_reference', s(header.deferredPaymentReference));
+  xml += t(6, 'Deffered_payment_reference', deferredPaymentReference);
   xml += `      <Financial_transaction>\n`;
   xml += t(8, 'Code_1', s(header.financialTransactionCode1));
   xml += t(8, 'Code_2', s(header.financialTransactionCode2));
@@ -231,6 +233,26 @@ export function generateAsycudaXml(declaration: Declaration): string {
     xml += t(10, 'Currency_code', s(item.invoiceCurrencyCode) || 'USD');
     xml += `        </Invoice>\n`;
     xml += `      </Valuation_item>\n`;
+
+    const vehicle = vehicles?.find(v => v.itemId === item.id);
+    if (vehicle) {
+      xml += `      <Vehicle>\n`;
+      xml += t(8, 'Vin_number', s(vehicle.vinNumber));
+      xml += t(8, 'Stock_number', s(vehicle.stockNumber));
+      xml += t(8, 'Make', s(vehicle.make));
+      xml += t(8, 'Model', s(vehicle.model));
+      xml += t(8, 'Year', s(vehicle.year));
+      xml += t(8, 'Color', s(vehicle.color));
+      xml += t(8, 'Engine_type', s(vehicle.engineType));
+      xml += t(8, 'Engine_number', s(vehicle.engineNumber));
+      xml += t(8, 'Fuel_type', s(vehicle.fuelType));
+      xml += t(8, 'Transmission', s(vehicle.transmission));
+      xml += t(8, 'Invoice_value', n(vehicle.invoiceValue));
+      xml += t(8, 'Invoice_currency', s(vehicle.invoiceCurrency) || 'USD');
+      xml += t(8, 'Gross_weight', n(vehicle.grossWeight));
+      xml += t(8, 'Net_weight', n(vehicle.netWeight));
+      xml += `      </Vehicle>\n`;
+    }
 
     // Field 44 — Attached documents
     if (item.attachedDocuments && item.attachedDocuments.length > 0) {

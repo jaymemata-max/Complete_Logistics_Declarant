@@ -13,6 +13,7 @@ import { SplitTab } from './tabs/SplitTab';
 import { XmlPreviewTab } from './tabs/XmlPreviewTab';
 import { GenerateInvoiceModal } from './GenerateInvoiceModal';
 import { saveDeclaration, updateDeclarationStatus, saveTemplate } from '../lib/db';
+import { sanitizeDeclarationForSave, validateDeclarationForSubmit } from '../utils/declarationRules';
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT:       'bg-yellow-100 text-yellow-800',
@@ -43,9 +44,10 @@ export const DeclarationWorkspace: React.FC = () => {
 
   const handleSaveDraft = async () => {
     setSaving(true);
-    const id = await saveDeclaration({ ...declaration, status: 'DRAFT' });
+    const draftDeclaration = sanitizeDeclarationForSave({ ...declaration, status: 'DRAFT' });
+    const id = await saveDeclaration(draftDeclaration);
     if (id) {
-      setDeclaration({ ...declaration, id, status: 'DRAFT' });
+      setDeclaration({ ...draftDeclaration, id, status: 'DRAFT' });
       showMessage('ok', 'Declaration saved');
     } else {
       showMessage('err', 'Save failed — check console');
@@ -54,24 +56,28 @@ export const DeclarationWorkspace: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    const submittedDeclaration = sanitizeDeclarationForSave({ ...declaration, status: 'SUBMITTED' });
+    const validationErrors = validateDeclarationForSubmit(submittedDeclaration);
+    if (validationErrors.length > 0) {
+      console.warn('Submit blocked by validation:', validationErrors);
+      showMessage('err', validationErrors[0]);
+      return;
+    }
+
     if (!window.confirm('Mark this declaration as submitted? This means you have uploaded the XML to ASYCUDAWorld. The status will change to Submitted.')) return;
     setSubmitting(true);
 
-    // First save if it has local ID
-    let id = declaration.id;
-    if (id.startsWith('local-')) {
-      const savedId = await saveDeclaration(declaration);
-      if (!savedId) {
-        showMessage('err', 'Could not save before submitting');
-        setSubmitting(false);
-        return;
-      }
-      id = savedId;
+    const savedId = await saveDeclaration(submittedDeclaration);
+    if (!savedId) {
+      showMessage('err', 'Could not save before submitting');
+      setSubmitting(false);
+      return;
     }
+    const id = savedId;
 
     const ok = await updateDeclarationStatus(id, 'SUBMITTED');
     if (ok) {
-      setDeclaration({ ...declaration, id, status: 'SUBMITTED', submittedAt: new Date() });
+      setDeclaration({ ...submittedDeclaration, id, status: 'SUBMITTED', submittedAt: new Date() });
       showMessage('ok', 'Declaration submitted');
     } else {
       showMessage('err', 'Submit failed — check console');

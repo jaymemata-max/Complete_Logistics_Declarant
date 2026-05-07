@@ -6,6 +6,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { supabase } from '../../lib/supabase';
+import { LEGACY_PAYMENT_CODES, normalizeDeferredPaymentReference } from '../../utils/declarationRules';
 import type { Importer, Vessel } from '../../types';
 
 interface DeclarationTypeOption {
@@ -36,8 +37,6 @@ const FALLBACK_PAYMENT_ACCOUNTS = [
   { code: 'MARICAR LOG. 33', description: 'Complete Logistics deferred account' },
   { code: 'MARICAR LOG. 34', description: 'Complete Logistics deferred account' },
 ];
-
-const LEGACY_PAYMENT_CODES = new Set(['CONTANT', 'KREDIET', 'NVT']);
 
 // ── Generic searchable dropdown ───────────────────────────────────────────────
 
@@ -205,6 +204,7 @@ export const HeaderTab: React.FC = () => {
   const { header } = declaration;
   const h = (field: keyof typeof header, value: any) => updateHeader({ [field]: value });
   const declarationTypeValue = `${header.typeOfDeclaration}|${header.generalProcedureCode}`;
+  const paymentReferenceValue = normalizeDeferredPaymentReference(header.deferredPaymentReference) || '__CASH__';
 
   const updateDeclarationType = (value: string) => {
     const [typeOfDeclaration, generalProcedureCode] = value.split('|');
@@ -571,7 +571,7 @@ export const HeaderTab: React.FC = () => {
               <div className="space-y-2">
                 <Label>Field 48 — Deferred payment account</Label>
                 <Select
-                  value={header.deferredPaymentReference || '__CASH__'}
+                  value={paymentReferenceValue}
                   onValueChange={v => h('deferredPaymentReference', v === '__CASH__' ? '' : v)}
                 >
                   <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>

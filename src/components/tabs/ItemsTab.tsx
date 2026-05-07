@@ -8,7 +8,7 @@ import { Button } from '../ui/button';
 import { supabase } from '../../lib/supabase';
 import { Plus, Trash2, Copy, ChevronRight, ChevronDown, Upload } from 'lucide-react';
 import { ImportItemsModal } from '../ImportItemsModal';
-import type { DeclarationItem } from '../../types';
+import type { DeclarationContainer, DeclarationItem } from '../../types';
 
 // ── Commodity master search ───────────────────────────────────────────────────
 
@@ -232,7 +232,7 @@ export const ItemsTab: React.FC = () => {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setShowImport(true)}>
-            <Upload className="h-4 w-4 mr-2" /> Import Items
+            <Upload className="h-4 w-4 mr-2" /> Import ED / Invoice / B/L
           </Button>
           <Button onClick={addItem}>
             <Plus className="h-4 w-4 mr-2" /> Add Item
@@ -249,10 +249,40 @@ export const ItemsTab: React.FC = () => {
               ...item,
               id: Math.random().toString(36).substring(2, 9),
               itemNumber: startNumber + i,
-              supplementaryUnits: [],
-              attachedDocuments: [],
+              supplementaryUnits: item.supplementaryUnits || [],
+              attachedDocuments: item.attachedDocuments || [],
             })) as DeclarationItem[];
-            updateDeclaration({ items: [...declaration.items, ...itemsToAdd] });
+            const nextItems = [...declaration.items, ...itemsToAdd];
+            updateDeclaration({
+              items: nextItems,
+              header: {
+                ...declaration.header,
+                totalNumberOfPackages: nextItems.reduce((sum, item) => sum + (item.numberOfPackages || 0), 0),
+                grossWeight: nextItems.reduce((sum, item) => sum + (item.grossWeight || 0), 0),
+                invoiceAmount: nextItems.reduce((sum, item) => sum + (item.invoiceAmount || 0), 0),
+              },
+            });
+            setShowImport(false);
+          }}
+          onImportContainers={(newContainers) => {
+            const containersToAdd = newContainers.map(container => ({
+              id: Math.random().toString(36).substring(2, 9),
+              itemNumber: container.itemNumber || 0,
+              containerNumber: container.containerNumber || '',
+              containerType: container.containerType || '',
+              emptyFullIndicator: container.emptyFullIndicator || 'F',
+              goodsDescription: container.goodsDescription || '',
+              packagesType: container.packagesType || '',
+              packagesNumber: container.packagesNumber || 0,
+              packagesWeight: container.packagesWeight || 0,
+            })) as DeclarationContainer[];
+            updateDeclaration({
+              containers: [...declaration.containers, ...containersToAdd],
+              header: {
+                ...declaration.header,
+                containerFlag: true,
+              },
+            });
             setShowImport(false);
           }}
           onClose={() => setShowImport(false)}

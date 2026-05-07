@@ -5,8 +5,10 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Button } from '../ui/button';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { ImportItemsModal } from '../ImportItemsModal';
+import type { DeclarationContainer } from '../../types';
 
 const describeItem = (item: any) =>
   item?.descriptionOfGoods || item?.commercialDescription || item?.tradeNameSearch || '';
@@ -14,6 +16,7 @@ const describeItem = (item: any) =>
 export const ContainersTab: React.FC = () => {
   const { declaration, addContainer, updateContainer, deleteContainer, updateDeclaration } = useDeclaration();
   const [packageTypes, setPackageTypes] = useState<{ code: string; description: string }[]>([]);
+  const [showImport, setShowImport] = useState(false);
 
   useEffect(() => {
     supabase
@@ -63,10 +66,45 @@ export const ContainersTab: React.FC = () => {
           <h2 className="text-lg font-semibold">Containers</h2>
           <p className="text-sm text-muted-foreground">Manage shipping containers for this FCL declaration</p>
         </div>
-        <Button onClick={handleAddContainer}>
-          <Plus className="h-4 w-4 mr-2" /> Add Container
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowImport(true)}>
+            <Upload className="h-4 w-4 mr-2" /> Import B/L
+          </Button>
+          <Button onClick={handleAddContainer}>
+            <Plus className="h-4 w-4 mr-2" /> Add Container
+          </Button>
+        </div>
       </div>
+
+      {showImport && (
+        <ImportItemsModal
+          existingItemCount={declaration.items.length}
+          initialMode="containers"
+          onImport={() => {}}
+          onImportContainers={(newContainers) => {
+            const containersToAdd = newContainers.map(container => ({
+              id: Math.random().toString(36).substring(2, 9),
+              itemNumber: container.itemNumber || 0,
+              containerNumber: container.containerNumber || '',
+              containerType: container.containerType || '',
+              emptyFullIndicator: container.emptyFullIndicator || 'F',
+              goodsDescription: container.goodsDescription || '',
+              packagesType: container.packagesType || '',
+              packagesNumber: container.packagesNumber || 0,
+              packagesWeight: container.packagesWeight || 0,
+            })) as DeclarationContainer[];
+            updateDeclaration({
+              containers: [...declaration.containers, ...containersToAdd],
+              header: {
+                ...declaration.header,
+                containerFlag: true,
+              },
+            });
+            setShowImport(false);
+          }}
+          onClose={() => setShowImport(false)}
+        />
+      )}
 
       <div className="space-y-4">
         {declaration.containers.map((container, index) => (

@@ -1,25 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useDeclaration } from '../../store/DeclarationContext';
 import { generateAsycudaXml } from '../../utils/xmlGenerator';
+import {
+  isLegacyPaymentReference,
+  requiresVehicleInfo,
+  validateContainerDetails,
+  validateVehicleDetails,
+} from '../../utils/declarationRules';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Copy, Download, Check, AlertTriangle } from 'lucide-react';
-
-const requiresVehicleInfo = (hsCode: string) => {
-  const hs = hsCode.replace(/\D/g, '');
-  return hs.startsWith('8426')
-    || hs.startsWith('8427')
-    || hs.startsWith('8429')
-    || hs.startsWith('8430')
-    || hs.startsWith('8432')
-    || hs.startsWith('86')
-    || /^870[1-6]/.test(hs)
-    || hs.startsWith('8709')
-    || hs.startsWith('8710')
-    || hs.startsWith('8711')
-    || hs.startsWith('8713')
-    || /^890[1-8]/.test(hs);
-};
 
 export const XmlPreviewTab: React.FC = () => {
   const { declaration } = useDeclaration();
@@ -49,12 +39,15 @@ export const XmlPreviewTab: React.FC = () => {
       if (!header.transportIdentity) newWarnings.push('Header: Missing Transport Identity');
       if (!header.transportNationality) newWarnings.push('Header: Missing Transport Nationality');
       if (!header.deliveryTermsCode) newWarnings.push('Header: Missing Delivery Terms Code');
+      if (isLegacyPaymentReference(header.deferredPaymentReference)) {
+        newWarnings.push('Header: Field 48 cannot be CONTANT, KREDIET, or NVT. Leave it empty for cash or select a real credit account.');
+      }
       if (!header.invoiceAmount || header.invoiceAmount <= 0) newWarnings.push('Header: Total Invoice Amount must be greater than 0');
       if (!header.grossWeight || header.grossWeight <= 0) newWarnings.push('Header: Total Gross Weight must be greater than 0');
       if (!header.totalNumberOfPackages || header.totalNumberOfPackages <= 0) newWarnings.push('Header: Total Number of Packages must be greater than 0');
 
       if (items.length === 0) newWarnings.push('Declaration has no items');
-      if (header.containerFlag && containers.length === 0) newWarnings.push('Container flag is true but no containers added');
+      newWarnings.push(...validateContainerDetails(declaration));
 
       // Structural Validation
       let totalItemPackages = 0;
@@ -83,6 +76,7 @@ export const XmlPreviewTab: React.FC = () => {
           const linkedVehicle = vehicles.find(v => v.itemId === item.id);
           const hasSupplementaryUnitQuantity = item.supplementaryUnits?.some(su => su.quantity > 0);
           if (!linkedVehicle) newWarnings.push(`Item ${item.itemNumber}: Vehicle information required for this HS code`);
+          if (linkedVehicle) newWarnings.push(...validateVehicleDetails(linkedVehicle, item.itemNumber));
           if (!hasSupplementaryUnitQuantity) newWarnings.push(`Item ${item.itemNumber}: Field 41 supplementary unit quantity required for vehicle goods`);
         }
 
@@ -94,14 +88,7 @@ export const XmlPreviewTab: React.FC = () => {
       // Container Validation
       let totalContainerPackages = 0;
       if (header.containerFlag) {
-        containers.forEach((container, index) => {
-          const containerNum = index + 1;
-          if (!container.containerNumber) newWarnings.push(`Container ${containerNum}: Missing Container Number`);
-          if (!container.containerType) newWarnings.push(`Container ${containerNum}: Missing Container Type`);
-          if (!container.emptyFullIndicator) newWarnings.push(`Container ${containerNum}: Missing Empty/Full Indicator`);
-          if (!container.packagesNumber || container.packagesNumber <= 0) newWarnings.push(`Container ${containerNum}: Packages Number must be greater than 0`);
-          if (!container.packagesWeight || container.packagesWeight <= 0) newWarnings.push(`Container ${containerNum}: Packages Weight must be greater than 0`);
-          
+        containers.forEach((container) => {
           totalContainerPackages += container.packagesNumber || 0;
         });
       }

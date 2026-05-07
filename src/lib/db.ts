@@ -1,7 +1,19 @@
 import { supabase } from './supabase';
 import type { Declaration, DeclarationHeader, DeclarationItem, DeclarationContainer, Template } from '../types';
+import { normalizeDeferredPaymentReference } from '../utils/declarationRules';
 
 const digitsOnly = (value: string | undefined | null) => (value || '').replace(/\D/g, '');
+
+const normalizeDeclarationType = (header: any) => {
+  if (!header) return header;
+  if (header.typeOfDeclaration === 'IM') {
+    return { ...header, typeOfDeclaration: 'INV', generalProcedureCode: '4' };
+  }
+  if (header.typeOfDeclaration === 'EX') {
+    return { ...header, typeOfDeclaration: 'UIT', generalProcedureCode: '1' };
+  }
+  return header;
+};
 
 // ─────────────────────────────────────────────────────────────
 // Types for list view (lightweight, no full item data)
@@ -127,7 +139,7 @@ export async function loadDeclaration(id: string): Promise<Declaration | null> {
     deliveryTermsPlace: h.delivery_terms_place || '',
     borderOfficeCode: h.border_office_code || '',
     placeOfLoadingCode: h.place_of_loading_code || '',
-    deferredPaymentReference: h.deferred_payment_reference || '',
+    deferredPaymentReference: normalizeDeferredPaymentReference(h.deferred_payment_reference),
     financialTransactionCode1: h.financial_transaction_code_1 || '',
     financialTransactionCode2: h.financial_transaction_code_2 || '',
     warehouseIdentification: h.warehouse_identification || '',
@@ -277,7 +289,7 @@ export async function saveDeclaration(declaration: Declaration): Promise<string 
     delivery_terms_place: h.deliveryTermsPlace,
     border_office_code: h.borderOfficeCode,
     place_of_loading_code: h.placeOfLoadingCode,
-    deferred_payment_reference: h.deferredPaymentReference,
+    deferred_payment_reference: normalizeDeferredPaymentReference(h.deferredPaymentReference),
     financial_transaction_code_1: h.financialTransactionCode1,
     financial_transaction_code_2: h.financialTransactionCode2,
     warehouse_identification: h.warehouseIdentification,
@@ -449,7 +461,7 @@ export async function listTemplates(): Promise<Template[]> {
     code: t.code,
     description: t.description,
     isShared: t.is_shared,
-    headerSnapshot: t.header_snapshot,
+    headerSnapshot: normalizeDeclarationType(t.header_snapshot),
   }));
 }
 
@@ -462,7 +474,10 @@ export async function saveTemplate(
     code,
     description,
     is_shared: true,
-    header_snapshot: header,
+    header_snapshot: normalizeDeclarationType({
+      ...header,
+      deferredPaymentReference: normalizeDeferredPaymentReference(header.deferredPaymentReference),
+    }),
   }, { onConflict: 'code' });
 
   if (error) { console.error('saveTemplate error:', error); return false; }
