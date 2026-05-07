@@ -118,6 +118,7 @@ export const ItemsTab: React.FC = () => {
   const [packageTypes, setPackageTypes] = useState<{ code: string; description: string }[]>([]);
   const [countries, setCountries] = useState<{ code: string; name: string }[]>([]);
   const [documentTypes, setDocumentTypes] = useState<{ code: string; description: string }[]>(FALLBACK_ATTACHED_DOCUMENT_TYPES);
+  const [importReviewNotes, setImportReviewNotes] = useState<string[]>([]);
 
   useEffect(() => {
     Promise.all([
@@ -240,6 +241,15 @@ export const ItemsTab: React.FC = () => {
         </div>
       </div>
 
+      {importReviewNotes.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <div className="font-medium">Imported ED/SAD data needs review</div>
+          <ul className="list-disc list-inside mt-2 space-y-1">
+            {importReviewNotes.map((note, index) => <li key={index}>{note}</li>)}
+          </ul>
+        </div>
+      )}
+
       {showImport && (
         <ImportItemsModal
           existingItemCount={declaration.items.length}
@@ -283,6 +293,37 @@ export const ItemsTab: React.FC = () => {
                 containerFlag: true,
               },
             });
+            setShowImport(false);
+          }}
+          onImportDraft={(draft) => {
+            const itemsToAdd = draft.items.map(item => ({
+              ...item,
+              id: item.id || Math.random().toString(36).substring(2, 9),
+              supplementaryUnits: item.supplementaryUnits || [],
+              attachedDocuments: item.attachedDocuments || [],
+            })) as DeclarationItem[];
+            const containersToAdd = draft.containers.map(container => ({
+              id: container.id || Math.random().toString(36).substring(2, 9),
+              itemNumber: container.itemNumber || 0,
+              containerNumber: container.containerNumber || '',
+              containerType: container.containerType || '',
+              emptyFullIndicator: container.emptyFullIndicator || 'F',
+              goodsDescription: container.goodsDescription || '',
+              packagesType: container.packagesType || '',
+              packagesNumber: container.packagesNumber || 0,
+              packagesWeight: container.packagesWeight || 0,
+            })) as DeclarationContainer[];
+            const nextItems = [...declaration.items, ...itemsToAdd];
+            updateDeclaration({
+              items: nextItems,
+              containers: [...declaration.containers, ...containersToAdd],
+              shipmentType: draft.header.shipmentType || declaration.shipmentType,
+              header: {
+                ...declaration.header,
+                ...draft.header,
+              },
+            });
+            setImportReviewNotes(draft.reviewNotes);
             setShowImport(false);
           }}
           onClose={() => setShowImport(false)}

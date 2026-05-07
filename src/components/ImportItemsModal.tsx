@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { X, Upload, ChevronRight, Check, FileText, Ship, Table } from 'lucide-react';
-import type { DeclarationContainer, DeclarationItem } from '../types';
+import type { DeclarationContainer, DeclarationHeader, DeclarationItem } from '../types';
+import { parseSadPdfText } from '../utils/edPdfParser';
 
 // ── Shared parsing helpers ────────────────────────────────────────────────────
 
@@ -205,50 +206,6 @@ function findDescription(lines: string[], index: number): string {
   return (candidates[0] || '').slice(0, 88);
 }
 
-function findBillNumber(text: string): string {
-  const match = text.match(/\b(?:B\/L|BL|BOL|AWB|Vrachtbrief|Bill of Lading)\s*(?:No\.?|Number|#)?\s*[:\-]?\s*([A-Z0-9][A-Z0-9\-\/]{4,25})/i);
-  return match?.[1]?.replace(/[^\w/-]/g, '') || '';
-}
-
-function parseEDText(text: string, existingItemCount: number): DeclarationItem[] {
-  const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-  const billNumber = findBillNumber(text);
-  const found: DeclarationItem[] = [];
-  const seen = new Set<string>();
-
-  lines.forEach((line, lineIndex) => {
-    const hsMatch = line.match(/\b(\d{4}[\d.\s-]{2,12})\b/);
-    const hsCode = digitsOnly(hsMatch?.[1]);
-    if (!hsCode || hsCode.length < 6 || hsCode.length > 10 || seen.has(`${lineIndex}-${hsCode}`)) return;
-
-    const item = defaultItem(existingItemCount + found.length + 1);
-    const context = nearbyLines(lines, lineIndex, 4).join(' ');
-    const pkgMatch = context.match(/(\d+(?:[.,]\d+)?)\s*(CTN?|CARTONS?|BX|BOXES?|PK|PKGS?|PL|PALLETS?|PCS|PIECES?|STKS?)\b/i);
-    const grossMatch = context.match(/\b(?:gross|bruto|weight|gewicht)\D{0,12}(\d+(?:[.,]\d+)?)\s*(?:kg|kgs)?\b/i);
-    const netMatch = context.match(/\b(?:net|netto)\D{0,12}(\d+(?:[.,]\d+)?)\s*(?:kg|kgs)?\b/i);
-    const amountMatch = context.match(/\b(?:USD|AWG|EUR)?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})|\d+(?:[.,]\d{2}))\b/);
-    const originMatch = context.match(/\b(?:origin|oorsprong|country)\D{0,12}([A-Z]{2,3})\b/i);
-    const description = findDescription(lines, lineIndex);
-
-    item.hsCode = hsCode;
-    item.tradeNameSearch = description || `Imported item ${found.length + 1}`;
-    item.commercialDescription = (description || item.tradeNameSearch).slice(0, 44);
-    item.descriptionOfGoods = description || item.tradeNameSearch;
-    item.previousDocumentSummaryDeclaration = billNumber;
-    item.numberOfPackages = parseNumber(pkgMatch?.[1]);
-    item.kindOfPackagesCode = packageCode(pkgMatch?.[2]) || 'STKS';
-    item.grossWeight = parseNumber(grossMatch?.[1]);
-    item.netWeight = parseNumber(netMatch?.[1]) || item.grossWeight;
-    item.invoiceAmount = parseNumber(amountMatch?.[1]);
-    item.countryOfOriginCode = (originMatch?.[1] || '').toUpperCase();
-
-    found.push(item);
-    seen.add(`${lineIndex}-${hsCode}`);
-  });
-
-  return found;
-}
-
 function parseContainers(text: string): Partial<DeclarationContainer>[] {
   const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   const containers: Partial<DeclarationContainer>[] = [];
@@ -280,12 +237,34 @@ function parseContainers(text: string): Partial<DeclarationContainer>[] {
   return containers;
 }
 
+async function extractPdfText(file: File): Promise<string> {
+  const pdfjsLib = await import('pdfjs-dist');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+  const buffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  const pages: string[] = [];
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    pages.push(content.items.map((item: any) => item.str || '').join('\n'));
+  }
+
+  return pages.join('\n\n').trim();
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
   existingItemCount: number;
   onImport: (items: Partial<DeclarationItem>[]) => void;
   onImportContainers?: (containers: Partial<DeclarationContainer>[]) => void;
+  onImportDraft?: (draft: {
+    header: Partial<DeclarationHeader>;
+    items: Partial<DeclarationItem>[];
+    containers: Partial<DeclarationContainer>[];
+    reviewNotes: string[];
+  }) => void;
   initialMode?: ImportWorkflowMode;
   onClose: () => void;
 }
@@ -314,7 +293,7 @@ const MODE_COPY: Record<ImportWorkflowMode, { title: string; description: string
   },
 };
 
-export const ImportItemsModal: React.FC<Props> = ({ existingItemCount, onImport, onImportContainers, initialMode = 'invoice', onClose }) => {
+export const ImportItemsModal: React.FC<Props> = ({ existingItemCount, onImport, onImportContainers, onImportDraft, initialMode = 'invoice', onClose }) => {
   const [mode, setMode] = useState<ImportWorkflowMode>(initialMode);
   const [step, setStep] = useState<Step>('paste');
   const [rawText, setRawText] = useState('');
@@ -324,6 +303,8 @@ export const ImportItemsModal: React.FC<Props> = ({ existingItemCount, onImport,
   const [hasHeader, setHasHeader] = useState(true);
   const [previewItems, setPreviewItems] = useState<Partial<DeclarationItem>[]>([]);
   const [previewContainers, setPreviewContainers] = useState<Partial<DeclarationContainer>[]>([]);
+  const [previewHeader, setPreviewHeader] = useState<Partial<DeclarationHeader>>({});
+  const [reviewNotes, setReviewNotes] = useState<string[]>([]);
   const [parseError, setParseError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -334,6 +315,8 @@ export const ImportItemsModal: React.FC<Props> = ({ existingItemCount, onImport,
     setMapping([]);
     setPreviewItems([]);
     setPreviewContainers([]);
+    setPreviewHeader({});
+    setReviewNotes([]);
     setParseError('');
   };
 
@@ -359,9 +342,12 @@ export const ImportItemsModal: React.FC<Props> = ({ existingItemCount, onImport,
     }
 
     if (mode === 'ed') {
-      const items = parseEDText(rawText, existingItemCount);
-      setPreviewItems(items);
-      setParseError(items.length ? '' : 'No item lines found. Paste the PDF text, or use Invoice / packing list CSV mapping.');
+      const parsed = parseSadPdfText(rawText, existingItemCount);
+      setPreviewItems(parsed.items);
+      setPreviewContainers(parsed.containers);
+      setPreviewHeader(parsed.header);
+      setReviewNotes(parsed.reviewNotes);
+      setParseError(parsed.items.length ? '' : 'No item lines found. Paste the PDF text, or use Invoice / packing list CSV mapping.');
       setStep('preview');
       return;
     }
@@ -372,18 +358,29 @@ export const ImportItemsModal: React.FC<Props> = ({ existingItemCount, onImport,
     setStep('preview');
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.name.toLowerCase().endsWith('.pdf')) {
-      setParseError('Direct PDF extraction is not available yet. Open the PDF, copy the text, and paste it here.');
+      setParseError('Reading PDF text...');
+      try {
+        const text = await extractPdfText(file);
+        setRawText(text);
+        setParseError(text ? 'PDF text extracted. Review it, then extract into the declaration.' : 'No selectable text found in this PDF. Run OCR first, then upload again.');
+      } catch (error) {
+        console.error('PDF extraction failed:', error);
+        setParseError('Could not read this PDF. If it is scanned, run OCR first or copy/paste the text manually.');
+      } finally {
+        e.target.value = '';
+      }
       return;
     }
 
     const reader = new FileReader();
     reader.onload = (ev) => setRawText(ev.target?.result as string || '');
     reader.readAsText(file);
+    e.target.value = '';
   };
 
   const handlePreview = () => {
@@ -393,7 +390,14 @@ export const ImportItemsModal: React.FC<Props> = ({ existingItemCount, onImport,
   };
 
   const handleImport = () => {
-    if (mode === 'containers') {
+    if (mode === 'ed' && onImportDraft) {
+      onImportDraft({
+        header: previewHeader,
+        items: previewItems,
+        containers: previewContainers,
+        reviewNotes,
+      });
+    } else if (mode === 'containers') {
       onImportContainers?.(previewContainers);
     } else {
       onImport(previewItems);
@@ -476,7 +480,7 @@ export const ImportItemsModal: React.FC<Props> = ({ existingItemCount, onImport,
                 )}
                 <div className="flex-1" />
                 <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                  <Upload className="h-3.5 w-3.5 mr-1.5" /> Upload text/CSV
+                  <Upload className="h-3.5 w-3.5 mr-1.5" /> Upload PDF/text/CSV
                 </Button>
                 <input ref={fileRef} type="file" accept=".csv,.tsv,.txt,.pdf" className="hidden" onChange={handleFileUpload} />
               </div>
@@ -495,7 +499,7 @@ export const ImportItemsModal: React.FC<Props> = ({ existingItemCount, onImport,
               />
 
               <p className="text-xs text-muted-foreground">
-                For PDFs, open the file and copy the selectable text into this box. Scanned PDFs still need OCR before import.
+                PDF upload works when the document has selectable text. Scanned PDFs still need OCR before import.
               </p>
             </div>
           )}
@@ -542,6 +546,29 @@ export const ImportItemsModal: React.FC<Props> = ({ existingItemCount, onImport,
                   {parseError}
                 </div>
               )}
+              {mode === 'ed' && (
+                <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+                  <div className="font-medium mb-2">Header values found</div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                    <div><span className="text-muted-foreground">Type</span><br />{previewHeader.typeOfDeclaration || '—'} {previewHeader.generalProcedureCode || ''}</div>
+                    <div><span className="text-muted-foreground">Shipment</span><br />{previewHeader.shipmentType || '—'}</div>
+                    <div><span className="text-muted-foreground">Manifest</span><br />{previewHeader.manifestReferenceNumber || '—'}</div>
+                    <div><span className="text-muted-foreground">Field 48</span><br />{previewHeader.deferredPaymentReference || 'empty'}</div>
+                    <div><span className="text-muted-foreground">Consignee</span><br />{previewHeader.consigneeName || '—'}</div>
+                    <div><span className="text-muted-foreground">Transport</span><br />{previewHeader.transportIdentity || '—'}</div>
+                    <div><span className="text-muted-foreground">Packages</span><br />{previewHeader.totalNumberOfPackages || '—'}</div>
+                    <div><span className="text-muted-foreground">Invoice</span><br />{previewHeader.invoiceCurrencyCode || 'USD'} {previewHeader.invoiceAmount || 0}</div>
+                  </div>
+                </div>
+              )}
+              {reviewNotes.length > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  <div className="font-medium">Needs broker confirmation</div>
+                  <ul className="list-disc list-inside mt-1 space-y-1">
+                    {reviewNotes.map((note, i) => <li key={i}>{note}</li>)}
+                  </ul>
+                </div>
+              )}
               <p className="text-sm text-muted-foreground">
                 Review the items before importing. {previewItems.length} item{previewItems.length !== 1 ? 's' : ''} will be added.
               </p>
@@ -575,6 +602,37 @@ export const ImportItemsModal: React.FC<Props> = ({ existingItemCount, onImport,
                   </tbody>
                 </table>
               </div>
+              {mode === 'ed' && previewContainers.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    {previewContainers.length} container{previewContainers.length !== 1 ? 's' : ''} found from the SAD text.
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          <th className="text-left p-2 border">Container</th>
+                          <th className="text-left p-2 border">Type</th>
+                          <th className="text-left p-2 border">Item</th>
+                          <th className="text-right p-2 border">Pkgs</th>
+                          <th className="text-right p-2 border">Weight</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {previewContainers.map((container, i) => (
+                          <tr key={i} className="border-b hover:bg-muted/20">
+                            <td className="p-2 border font-mono">{container.containerNumber || '—'}</td>
+                            <td className="p-2 border">{container.containerType || '—'}</td>
+                            <td className="p-2 border">{container.itemNumber || '—'}</td>
+                            <td className="p-2 border text-right">{container.packagesNumber || '—'} {container.packagesType || ''}</td>
+                            <td className="p-2 border text-right">{container.packagesWeight ? `${container.packagesWeight} kg` : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -641,7 +699,10 @@ export const ImportItemsModal: React.FC<Props> = ({ existingItemCount, onImport,
               disabled={mode === 'containers' ? previewContainers.length === 0 : previewItems.length === 0}
             >
               <Check className="h-4 w-4" />
-              Import {mode === 'containers' ? `${previewContainers.length} Containers` : `${previewItems.length} Items`}
+              {mode === 'ed'
+                ? `Apply Header + ${previewItems.length} Items`
+                : `Import ${mode === 'containers' ? `${previewContainers.length} Containers` : `${previewItems.length} Items`}`
+              }
             </Button>
           )}
         </div>

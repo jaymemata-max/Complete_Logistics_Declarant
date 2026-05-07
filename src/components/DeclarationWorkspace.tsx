@@ -12,7 +12,7 @@ import { VehicleTab } from './tabs/VehicleTab';
 import { SplitTab } from './tabs/SplitTab';
 import { XmlPreviewTab } from './tabs/XmlPreviewTab';
 import { GenerateInvoiceModal } from './GenerateInvoiceModal';
-import { saveDeclaration, updateDeclarationStatus, saveTemplate } from '../lib/db';
+import { getLastDbError, logWorkflowEvent, saveDeclaration, updateDeclarationStatus, saveTemplate } from '../lib/db';
 import { sanitizeDeclarationForSave, validateDeclarationForSubmit } from '../utils/declarationRules';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -27,6 +27,7 @@ export const DeclarationWorkspace: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateCode, setTemplateCode] = useState('');
   const [templateDesc, setTemplateDesc] = useState('');
@@ -48,9 +49,12 @@ export const DeclarationWorkspace: React.FC = () => {
     const id = await saveDeclaration(draftDeclaration);
     if (id) {
       setDeclaration({ ...draftDeclaration, id, status: 'DRAFT' });
-      showMessage('ok', 'Declaration saved');
+      const savedAt = new Date();
+      setLastSavedAt(savedAt);
+      await logWorkflowEvent(id, 'DRAFT_SAVED', 'Draft saved');
+      showMessage('ok', `Declaration saved ${savedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
     } else {
-      showMessage('err', 'Save failed — check console');
+      showMessage('err', `Save failed: ${getLastDbError() || 'check console'}`);
     }
     setSaving(false);
   };
@@ -69,7 +73,7 @@ export const DeclarationWorkspace: React.FC = () => {
 
     const savedId = await saveDeclaration(submittedDeclaration);
     if (!savedId) {
-      showMessage('err', 'Could not save before submitting');
+      showMessage('err', `Could not save before submitting: ${getLastDbError() || 'check console'}`);
       setSubmitting(false);
       return;
     }
@@ -78,9 +82,12 @@ export const DeclarationWorkspace: React.FC = () => {
     const ok = await updateDeclarationStatus(id, 'SUBMITTED');
     if (ok) {
       setDeclaration({ ...submittedDeclaration, id, status: 'SUBMITTED', submittedAt: new Date() });
-      showMessage('ok', 'Declaration submitted');
+      const savedAt = new Date();
+      setLastSavedAt(savedAt);
+      await logWorkflowEvent(id, 'SUBMITTED', 'Marked submitted after XML upload');
+      showMessage('ok', 'Declaration marked as submitted');
     } else {
-      showMessage('err', 'Submit failed — check console');
+      showMessage('err', `Submit failed: ${getLastDbError() || 'check console'}`);
     }
     setSubmitting(false);
   };
@@ -237,6 +244,12 @@ export const DeclarationWorkspace: React.FC = () => {
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">Customs Ref:</span>
             <span className="font-medium font-mono text-xs">{declaration.customsReferenceNumber}</span>
+          </div>
+        )}
+        {lastSavedAt && (
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Last Saved:</span>
+            <span className="font-medium">{lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
           </div>
         )}
       </div>

@@ -3,6 +3,16 @@ import type { Declaration, DeclarationHeader, DeclarationItem, DeclarationContai
 import { normalizeDeferredPaymentReference } from '../utils/declarationRules';
 
 const digitsOnly = (value: string | undefined | null) => (value || '').replace(/\D/g, '');
+let lastDbError = '';
+
+function recordDbError(context: string, error: any) {
+  lastDbError = error?.message || `${context} failed`;
+  console.error(`${context}:`, error);
+}
+
+export function getLastDbError(): string {
+  return lastDbError;
+}
 
 const normalizeDeclarationType = (header: any) => {
   if (!header) return header;
@@ -60,7 +70,7 @@ export async function listDeclarations(): Promise<DeclarationSummary[]> {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error('listDeclarations error:', error);
+    recordDbError('listDeclarations error', error);
     return [];
   }
 
@@ -102,7 +112,7 @@ export async function loadDeclaration(id: string): Promise<Declaration | null> {
   ]);
 
   if (declRes.error || !declRes.data) {
-    console.error('loadDeclaration error:', declRes.error);
+    recordDbError('loadDeclaration error', declRes.error);
     return null;
   }
 
@@ -229,6 +239,7 @@ export async function loadDeclaration(id: string): Promise<Declaration | null> {
 }
 
 export async function saveDeclaration(declaration: Declaration): Promise<string | null> {
+  lastDbError = '';
   const isNew = !declaration.id || declaration.id.startsWith('local-');
 
   // Upsert declaration root
@@ -247,14 +258,14 @@ export async function saveDeclaration(declaration: Declaration): Promise<string 
       .insert(declPayload)
       .select('id')
       .single();
-    if (error) { console.error('insert declaration error:', error); return null; }
+    if (error) { recordDbError('insert declaration error', error); return null; }
     declId = data.id;
   } else {
     const { error } = await supabase
       .from('declarations')
       .update(declPayload)
       .eq('id', declId);
-    if (error) { console.error('update declaration error:', error); return null; }
+    if (error) { recordDbError('update declaration error', error); return null; }
   }
 
   // Upsert header
@@ -308,26 +319,35 @@ export async function saveDeclaration(declaration: Declaration): Promise<string 
     splits_flag: h.splitsFlag,
   };
 
-  await supabase
+  const { error: headerError } = await supabase
     .from('declaration_headers')
     .upsert(headerPayload, { onConflict: 'declaration_id' });
+  if (headerError) { recordDbError('upsert declaration header error', headerError); return null; }
 
   // Delete and reinsert items (simplest approach for now)
   if (!isNew) {
     // Get existing item IDs to delete their children first
-    const { data: existingItems } = await supabase
+    const { data: existingItems, error: existingItemsError } = await supabase
       .from('declaration_items')
       .select('id')
       .eq('declaration_id', declId);
+    if (existingItemsError) { recordDbError('load existing declaration items error', existingItemsError); return null; }
 
     if (existingItems && existingItems.length > 0) {
       const ids = existingItems.map((i: any) => i.id);
-      await supabase.from('declaration_supplementary_units').delete().in('item_id', ids);
-      await supabase.from('declaration_attached_docs').delete().in('item_id', ids);
-      await supabase.from('declaration_vehicles').delete().in('item_id', ids);
-      await supabase.from('declaration_items').delete().eq('declaration_id', declId);
+      const childDeletes = await Promise.all([
+        supabase.from('declaration_supplementary_units').delete().in('item_id', ids),
+        supabase.from('declaration_attached_docs').delete().in('item_id', ids),
+        supabase.from('declaration_vehicles').delete().in('item_id', ids),
+      ]);
+      const childDeleteError = childDeletes.find(result => result.error)?.error;
+      if (childDeleteError) { recordDbError('delete declaration child rows error', childDeleteError); return null; }
+
+      const { error: itemDeleteError } = await supabase.from('declaration_items').delete().eq('declaration_id', declId);
+      if (itemDeleteError) { recordDbError('delete declaration items error', itemDeleteError); return null; }
     }
-    await supabase.from('declaration_containers').delete().eq('declaration_id', declId);
+    const { error: containerDeleteError } = await supabase.from('declaration_containers').delete().eq('declaration_id', declId);
+    if (containerDeleteError) { recordDbError('delete declaration containers error', containerDeleteError); return null; }
   }
 
   // Insert items
@@ -361,21 +381,25 @@ export async function saveDeclaration(declaration: Declaration): Promise<string 
       .select('id')
       .single();
 
-    if (itemError || !savedItem) continue;
+    if (itemError || !savedItem) {
+      recordDbError('insert declaration item error', itemError || new Error('No item returned after insert'));
+      return null;
+    }
     const itemId = savedItem.id;
 
     // Supplementary units
     if (item.supplementaryUnits.length > 0) {
-      await supabase.from('declaration_supplementary_units').insert(
+      const { error: supplementaryError } = await supabase.from('declaration_supplementary_units').insert(
         item.supplementaryUnits.map(su => ({
           item_id: itemId, rank: su.rank, code: su.code, quantity: su.quantity,
         }))
       );
+      if (supplementaryError) { recordDbError('insert supplementary units error', supplementaryError); return null; }
     }
 
     // Attached documents
     if (item.attachedDocuments.length > 0) {
-      await supabase.from('declaration_attached_docs').insert(
+      const { error: docsError } = await supabase.from('declaration_attached_docs').insert(
         item.attachedDocuments.map(doc => ({
           item_id: itemId,
           document_code: doc.documentCode,
@@ -384,12 +408,13 @@ export async function saveDeclaration(declaration: Declaration): Promise<string 
           document_date: doc.documentDate || null,
         }))
       );
+      if (docsError) { recordDbError('insert attached documents error', docsError); return null; }
     }
 
     // Vehicle
     const vehicle = declaration.vehicles?.find(v => v.itemId === item.id);
     if (vehicle) {
-      await supabase.from('declaration_vehicles').insert({
+      const { error: vehicleError } = await supabase.from('declaration_vehicles').insert({
         item_id: itemId,
         vin_number: vehicle.vinNumber,
         stock_number: vehicle.stockNumber,
@@ -406,12 +431,13 @@ export async function saveDeclaration(declaration: Declaration): Promise<string 
         gross_weight: vehicle.grossWeight,
         net_weight: vehicle.netWeight,
       });
+      if (vehicleError) { recordDbError('insert vehicle details error', vehicleError); return null; }
     }
   }
 
   // Insert containers
   if (declaration.containers.length > 0) {
-    await supabase.from('declaration_containers').insert(
+    const { error: containersError } = await supabase.from('declaration_containers').insert(
       declaration.containers.map(c => ({
         declaration_id: declId,
         item_number: c.itemNumber,
@@ -424,6 +450,7 @@ export async function saveDeclaration(declaration: Declaration): Promise<string 
         packages_weight: c.packagesWeight,
       }))
     );
+    if (containersError) { recordDbError('insert declaration containers error', containersError); return null; }
   }
 
   return declId;
@@ -440,8 +467,22 @@ export async function updateDeclarationStatus(
   if (extra?.customsReferenceNumber) payload.customs_reference_number = extra.customsReferenceNumber;
 
   const { error } = await supabase.from('declarations').update(payload).eq('id', id);
-  if (error) { console.error('updateDeclarationStatus error:', error); return false; }
+  if (error) { recordDbError('updateDeclarationStatus error', error); return false; }
   return true;
+}
+
+export async function logWorkflowEvent(
+  declarationId: string,
+  eventType: string,
+  message?: string
+): Promise<void> {
+  if (!declarationId || declarationId.startsWith('local-')) return;
+  const { error } = await supabase.from('declaration_workflow_events').insert({
+    declaration_id: declarationId,
+    event_type: eventType,
+    message: message || null,
+  });
+  if (error) console.warn('workflow event not recorded:', error.message);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -455,7 +496,7 @@ export async function listTemplates(): Promise<Template[]> {
     .eq('is_shared', true)
     .order('description');
 
-  if (error) { console.error('listTemplates error:', error); return []; }
+  if (error) { recordDbError('listTemplates error', error); return []; }
   return (data || []).map((t: any) => ({
     id: t.id,
     code: t.code,
@@ -480,7 +521,7 @@ export async function saveTemplate(
     }),
   }, { onConflict: 'code' });
 
-  if (error) { console.error('saveTemplate error:', error); return false; }
+  if (error) { recordDbError('saveTemplate error', error); return false; }
   return true;
 }
 
@@ -525,7 +566,7 @@ export async function listInvoices(): Promise<InvoiceSummary[]> {
     `)
     .order('created_at', { ascending: false });
 
-  if (error) { console.error('listInvoices error:', error); return []; }
+  if (error) { recordDbError('listInvoices error', error); return []; }
 
   return (data || []).map((inv: any) => ({
     id: inv.id,
@@ -604,10 +645,10 @@ export async function createInvoice(
     .select('id')
     .single();
 
-  if (invErr || !inv) { console.error('createInvoice error:', invErr); return null; }
+  if (invErr || !inv) { recordDbError('createInvoice error', invErr || new Error('No invoice returned after insert')); return null; }
 
   if (lines.length > 0) {
-    await supabase.from('invoice_lines').insert(
+    const { error: linesError } = await supabase.from('invoice_lines').insert(
       lines.map(l => ({
         invoice_id: inv.id,
         description: l.description,
@@ -616,6 +657,7 @@ export async function createInvoice(
         amount: l.amount,
       }))
     );
+    if (linesError) { recordDbError('insert invoice lines error', linesError); return null; }
   }
 
   return inv.id;
@@ -626,13 +668,13 @@ export async function markInvoicePaid(id: string, paid: boolean): Promise<boolea
     .from('invoices')
     .update({ paid })
     .eq('id', id);
-  if (error) { console.error('markInvoicePaid error:', error); return false; }
+  if (error) { recordDbError('markInvoicePaid error', error); return false; }
   return true;
 }
 
 export async function deleteInvoice(id: string): Promise<boolean> {
   await supabase.from('invoice_lines').delete().eq('invoice_id', id);
   const { error } = await supabase.from('invoices').delete().eq('id', id);
-  if (error) { console.error('deleteInvoice error:', error); return false; }
+  if (error) { recordDbError('deleteInvoice error', error); return false; }
   return true;
 }
