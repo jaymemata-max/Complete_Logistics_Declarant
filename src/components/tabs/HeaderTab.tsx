@@ -6,7 +6,6 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { supabase } from '../../lib/supabase';
-import { LEGACY_PAYMENT_CODES, normalizeDeferredPaymentReference } from '../../utils/declarationRules';
 import type { Importer, Vessel } from '../../types';
 
 interface DeclarationTypeOption {
@@ -31,11 +30,6 @@ const FALLBACK_DECLARATION_TYPES: DeclarationTypeOption[] = [
   { code: 'OP', procedure_code: '9', description: 'Overige Procedures' },
   { code: 'UIT', procedure_code: '1', description: 'Definitieve Uitvoer' },
   { code: 'UIT', procedure_code: '2', description: 'Tijdelijke Uitvoer' },
-];
-
-const FALLBACK_PAYMENT_ACCOUNTS = [
-  { code: 'MARICAR LOG. 33', description: 'Complete Logistics deferred account' },
-  { code: 'MARICAR LOG. 34', description: 'Complete Logistics deferred account' },
 ];
 
 // ── Generic searchable dropdown ───────────────────────────────────────────────
@@ -113,11 +107,13 @@ const SearchDropdown: React.FC<SearchDropdownProps> = ({
 // ── Supabase search functions ─────────────────────────────────────────────────
 
 async function searchImporters(q: string) {
-  const { data } = await supabase
+  console.log('searchImporters called with:', q);
+  const { data, error } = await supabase
     .from('importers')
     .select('asycuda_code, name, address1, default_duty_terms')
     .or(`name.ilike.%${q}%,asycuda_code.ilike.%${q}%`)
     .limit(10);
+  console.log('searchImporters result:', { data, error });
   return (data || []).map((r: any) => ({
     value: r.asycuda_code,
     label: r.name,
@@ -149,7 +145,7 @@ export const HeaderTab: React.FC = () => {
   const [offices, setOffices] = useState<{ code: string; place: string }[]>([]);
   const [locations, setLocations] = useState<{ code: string; place: string }[]>([]);
   const [entrepots, setEntrepots] = useState<{ code: string; description: string }[]>([]);
-  const [paymentAccounts, setPaymentAccounts] = useState<{ code: string; description: string }[]>(FALLBACK_PAYMENT_ACCOUNTS);
+  const [paymentAccounts, setPaymentAccounts] = useState<{ code: string; description: string }[]>([]);
   const [loadingPorts, setLoadingPorts] = useState<{ code: string; description: string }[]>([]);
   const [deliveryTerms, setDeliveryTerms] = useState<{ code: string; description: string }[]>([]);
   const [declarationTypes, setDeclarationTypes] = useState<DeclarationTypeOption[]>(FALLBACK_DECLARATION_TYPES);
@@ -159,32 +155,38 @@ export const HeaderTab: React.FC = () => {
     Promise.all([
       supabase.from('declaration_types').select('code, procedure_code, description').order('sort_order')
         .then(r => {
+          console.log('declaration_types result:', { data: r.data?.length, error: r.error });
           if (r.data?.length) setDeclarationTypes(r.data);
         }),
       supabase.from('countries').select('code, name').order('code')
         .then(r => {
+          console.log('countries result:', { data: r.data?.length, error: r.error });
           setCountries(r.data || []);
         }),
       supabase.from('locations_of_goods').select('code, place').order('code')
         .then(r => {
+          console.log('locations_of_goods result:', { data: r.data?.length, error: r.error });
           setLocations(r.data || []);
         }),
       supabase.from('entrepots').select('code, description').order('code')
         .then(r => {
+          console.log('entrepots result:', { data: r.data?.length, error: r.error });
           setEntrepots(r.data || []);
         }),
       supabase.from('payment_accounts').select('code, description').order('code')
         .then(r => {
-          const accounts = (r.data || []).filter(a => !LEGACY_PAYMENT_CODES.has(a.code));
-          setPaymentAccounts(accounts.length > 0 ? accounts : FALLBACK_PAYMENT_ACCOUNTS);
+          console.log('payment_accounts result:', { data: r.data?.length, error: r.error });
+          setPaymentAccounts(r.data || []);
         }),
       supabase.from('delivery_terms').select('code, description').order('code')
         .then(r => {
+          console.log('delivery_terms result:', { data: r.data?.length, error: r.error });
           setDeliveryTerms(r.data || []);
         }),
       // Port of loading — filter to Aruba ports only (AWXXX)
       supabase.from('ports').select('code, description').ilike('code', 'AW%').order('code')
         .then(r => {
+          console.log('ports result:', { data: r.data?.length, error: r.error });
           setLoadingPorts(r.data || []);
         }),
       // Offices — from locations_of_goods or a fixed list for now
@@ -195,7 +197,6 @@ export const HeaderTab: React.FC = () => {
   const { header } = declaration;
   const h = (field: keyof typeof header, value: any) => updateHeader({ [field]: value });
   const declarationTypeValue = `${header.typeOfDeclaration}|${header.generalProcedureCode}`;
-  const paymentReferenceValue = normalizeDeferredPaymentReference(header.deferredPaymentReference) || '__CASH__';
 
   const updateDeclarationType = (value: string) => {
     const [typeOfDeclaration, generalProcedureCode] = value.split('|');
@@ -560,14 +561,11 @@ export const HeaderTab: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Field 48 — Deferred payment account</Label>
-                <Select
-                  value={paymentReferenceValue}
-                  onValueChange={v => h('deferredPaymentReference', v === '__CASH__' ? '' : v)}
-                >
+                <Label>Field 48 — Rekeninghoudernummer</Label>
+                <Select value={header.deferredPaymentReference} onValueChange={v => h('deferredPaymentReference', v)}>
                   <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__CASH__">CONTANT — leave Field 48 empty</SelectItem>
+                    <SelectItem value="">— None —</SelectItem>
                     {paymentAccounts.map(a => (
                       <SelectItem key={a.code} value={a.code}>{a.code} — {a.description}</SelectItem>
                     ))}
@@ -576,18 +574,25 @@ export const HeaderTab: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <Label>Field 49 — Identificatie entrepot</Label>
-                <Select
-                  value={header.warehouseIdentification || '__NONE__'}
-                  onValueChange={v => h('warehouseIdentification', v === '__NONE__' ? '' : v)}
-                >
+                <Select value={header.warehouseIdentification} onValueChange={v => h('warehouseIdentification', v)}>
                   <SelectTrigger><SelectValue placeholder="Select entrepot" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__NONE__">— None —</SelectItem>
+                    <SelectItem value="">— None —</SelectItem>
                     {entrepots.map(e => (
                       <SelectItem key={e.code} value={e.code}>{e.code} — {e.description}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Financial Transaction Code 1</Label>
+                <Input value={header.financialTransactionCode1} onChange={e => h('financialTransactionCode1', e.target.value)} maxLength={1} />
+              </div>
+              <div className="space-y-2">
+                <Label>Financial Transaction Code 2</Label>
+                <Input value={header.financialTransactionCode2} onChange={e => h('financialTransactionCode2', e.target.value)} maxLength={1} />
               </div>
             </div>
           </CardContent>

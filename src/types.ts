@@ -108,7 +108,7 @@ export interface SupplementaryUnit {
 
 // Field 44 — Bijzondere vermeldingen
 // XML: <Items>/<Item>/<Attached_documents>/<Attached_document>
-// Codes can be selected from the VD attachdocs list, while reference/name stay editable.
+// All fields are free text — no fixed code list (confirmed from ASYCUDA SAD XML spec)
 export interface AttachedDocument {
   id: string;
   documentCode: string;       // Attached_document_code AN4

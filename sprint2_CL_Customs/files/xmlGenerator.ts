@@ -2,18 +2,14 @@ import { Declaration } from '../types';
 
 /**
  * Generates ASYCUDA SAD XML matching the format accepted by Aruba Customs.
- * Validated against real VDAUA5 exports (confirmed submissions).
+ * Structure validated against real VD exports and the ASYCUDA SAD XML spec.
  *
- * Fixes vs previous version:
- * - <SAD id="60"> added — present in every real VD submission
- * - <Assessment_notice> now contains Registration_year + Assessment_year
- * - <Consignee_name> removed — VD only sends Consignee_code
- * - <Declarant_name> removed — VD only sends Declarant_code
- * - <Border_information> now only <Mode> — VD never sends Identity/Nationality there
- * - <Valuation_method_code> removed — VD does not emit this
- * - <Description_of_goods> removed — VD does not emit this
- * - <Previous_document> FCL uses <Previous_document_reference>,
- *   LCL/Air/Alcohol use <Summary_declaration> + <Summary_declaration_sl>
+ * Key notes:
+ * - ASYCUDA spells "Deffered" with double 'f' — this is intentional
+ * - Container_flag, Location_of_goods come before Means_of_transport in Transport
+ * - Declarant Reference uses <Year> and <Number>, not <Reference_year>/<Reference_number>
+ * - Valuation uses individual cost elements, not a Total wrapper
+ * - Containers section always emitted (empty if no containers)
  */
 export function generateAsycudaXml(declaration: Declaration): string {
   const { header, items, containers } = declaration;
@@ -27,20 +23,18 @@ export function generateAsycudaXml(declaration: Declaration): string {
   const t = (indent: number, tag: string, content: string): string =>
     `${' '.repeat(indent)}<${tag}>${content}</${tag}>\n`;
 
-  const year = String(new Date().getFullYear());
-  const isFCL = header.shipmentType === 'FCL';
+  const empty = (indent: number, tag: string): string =>
+    `${' '.repeat(indent)}<${tag}></${tag}>\n`;
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
   xml += `<ASYCUDA>\n`;
-  xml += `  <SAD id="60">\n`;
+  xml += `  <SAD>\n`;
 
-  // Assessment_notice — always populated with current year
+  // ── Assessment_notice ──────────────────────────────────────────────────────
   xml += `    <Assessment_notice>\n`;
-  xml += t(6, 'Registration_year', year);
-  xml += t(6, 'Assessment_year', year);
   xml += `    </Assessment_notice>\n`;
 
-  // Identification
+  // ── Identification ─────────────────────────────────────────────────────────
   xml += `    <Identification>\n`;
   xml += t(6, 'Manifest_reference_number', s(header.manifestReferenceNumber));
   xml += t(6, 'Total_number_of_packages', String(header.totalNumberOfPackages || 0));
@@ -53,23 +47,25 @@ export function generateAsycudaXml(declaration: Declaration): string {
   xml += `      </Type>\n`;
   xml += `    </Identification>\n`;
 
-  // Traders — VD only sends Consignee_code, no Consignee_name
+  // ── Traders ────────────────────────────────────────────────────────────────
   xml += `    <Traders>\n`;
   xml += `      <Consignee>\n`;
   xml += t(8, 'Consignee_code', s(header.consigneeCode));
+  xml += t(8, 'Consignee_name', s(header.consigneeName));
   xml += `      </Consignee>\n`;
   xml += `    </Traders>\n`;
 
-  // Declarant — VD only sends Declarant_code, no Declarant_name
+  // ── Declarant ──────────────────────────────────────────────────────────────
   xml += `    <Declarant>\n`;
   xml += t(6, 'Declarant_code', s(header.declarantCode));
+  xml += t(6, 'Declarant_name', s(header.declarantName));
   xml += `      <Reference>\n`;
   xml += t(8, 'Year', s(header.referenceYear));
   xml += t(8, 'Number', s(header.referenceNumber));
   xml += `      </Reference>\n`;
   xml += `    </Declarant>\n`;
 
-  // General_information
+  // ── General_information ───────────────────────────────────────────────────
   xml += `    <General_information>\n`;
   xml += `      <Country>\n`;
   xml += t(8, 'Country_first_destination', s(header.countryFirstDestination));
@@ -83,10 +79,11 @@ export function generateAsycudaXml(declaration: Declaration): string {
   xml += `      </Country>\n`;
   xml += `    </General_information>\n`;
 
-  // Transport
+  // ── Transport ─────────────────────────────────────────────────────────────
   xml += `    <Transport>\n`;
   xml += t(6, 'Container_flag', header.containerFlag ? 'true' : 'false');
   xml += t(6, 'Location_of_goods', s(header.locationOfGoods));
+  // Field 30a — only emit if filled in
   if (header.locationOfGoodsAddress?.trim()) {
     xml += t(6, 'Location_of_goods_address', s(header.locationOfGoodsAddress));
   }
@@ -95,8 +92,13 @@ export function generateAsycudaXml(declaration: Declaration): string {
   xml += t(10, 'Identity', s(header.transportIdentity));
   xml += t(10, 'Nationality', s(header.transportNationality));
   xml += `        </Departure_arrival_information>\n`;
-  // VD only emits <Mode> in Border_information — no Identity/Nationality
   xml += `        <Border_information>\n`;
+  if (header.borderTransportIdentity?.trim()) {
+    xml += t(10, 'Identity', s(header.borderTransportIdentity));
+  }
+  if (header.borderTransportNationality?.trim()) {
+    xml += t(10, 'Nationality', s(header.borderTransportNationality));
+  }
   xml += t(10, 'Mode', s(header.borderTransportMode));
   xml += `        </Border_information>\n`;
   xml += `      </Means_of_transport>\n`;
@@ -112,7 +114,8 @@ export function generateAsycudaXml(declaration: Declaration): string {
   xml += `      </Place_of_loading>\n`;
   xml += `    </Transport>\n`;
 
-  // Financial — ASYCUDA spells "Deffered" with double 'f', intentional
+  // ── Financial ─────────────────────────────────────────────────────────────
+  // Note: ASYCUDA spells "Deffered" with double 'f' — intentional
   xml += `    <Financial>\n`;
   xml += t(6, 'Deffered_payment_reference', s(header.deferredPaymentReference));
   xml += `      <Financial_transaction>\n`;
@@ -121,12 +124,12 @@ export function generateAsycudaXml(declaration: Declaration): string {
   xml += `      </Financial_transaction>\n`;
   xml += `    </Financial>\n`;
 
-  // Warehouse
+  // ── Warehouse ─────────────────────────────────────────────────────────────
   xml += `    <Warehouse>\n`;
   xml += t(6, 'Identification', s(header.warehouseIdentification));
   xml += `    </Warehouse>\n`;
 
-  // Valuation
+  // ── Valuation ─────────────────────────────────────────────────────────────
   xml += `    <Valuation>\n`;
   xml += `      <Invoice>\n`;
   xml += t(8, 'Amount_foreign_currency', n(header.invoiceAmount));
@@ -150,7 +153,8 @@ export function generateAsycudaXml(declaration: Declaration): string {
   xml += `      </Deduction>\n`;
   xml += `    </Valuation>\n`;
 
-  // Containers — always emitted
+  // ── Containers ────────────────────────────────────────────────────────────
+  // Always emit the Containers block (empty if none)
   xml += `    <Containers>\n`;
   if (header.containerFlag && containers.length > 0) {
     containers.forEach(c => {
@@ -170,12 +174,13 @@ export function generateAsycudaXml(declaration: Declaration): string {
 
   xml += `  </SAD>\n`;
 
-  // Items
+  // ── Items ─────────────────────────────────────────────────────────────────
   xml += `  <Items>\n`;
 
   items.forEach(item => {
     xml += `    <Item>\n`;
 
+    // Packages
     xml += `      <Packages>\n`;
     xml += t(8, 'Number_of_packages', String(item.numberOfPackages || 0));
     xml += t(8, 'Marks1_of_packages', s(item.marks1));
@@ -183,22 +188,25 @@ export function generateAsycudaXml(declaration: Declaration): string {
     xml += t(8, 'Kind_of_packages_code', s(item.kindOfPackagesCode));
     xml += `      </Packages>\n`;
 
-    // Incoterms — item-level mirrors header delivery terms per VD format
+    // Incoterms (item-level — mirrors header delivery terms, per VD format)
     xml += `      <Incoterms>\n`;
     xml += t(8, 'Code', s(header.deliveryTermsCode));
     xml += t(8, 'Place', s(header.deliveryTermsPlace));
     xml += `      </Incoterms>\n`;
 
-    // Tariff — VD does not emit Valuation_method_code
+    // Tariff
     xml += `      <Tariff>\n`;
     xml += t(8, 'Extended_customs_procedure', s(item.extendedCustomsProcedure));
     xml += t(8, 'National_customs_procedure', s(item.nationalCustomsProcedure));
+    // Field 36 — Preference
     if (item.preferenceCode?.trim()) {
       xml += t(8, 'Preference_code', s(item.preferenceCode));
     }
+    xml += t(8, 'Valuation_method_code', s(item.valuationMethodCode) || '1');
     xml += `        <Harmonized_system>\n`;
     xml += t(10, 'Commodity_code', s(item.hsCode));
     xml += `        </Harmonized_system>\n`;
+    // Field 41 — Supplementary units
     if (item.supplementaryUnits && item.supplementaryUnits.length > 0) {
       item.supplementaryUnits.forEach(su => {
         xml += `        <Supplementary_unit>\n`;
@@ -207,6 +215,7 @@ export function generateAsycudaXml(declaration: Declaration): string {
         xml += `        </Supplementary_unit>\n`;
       });
     }
+    // Field 39 — Quota
     if (item.quotaNumber?.trim()) {
       xml += `        <Quota>\n`;
       xml += t(10, 'Quota_code', s(item.quotaNumber));
@@ -214,12 +223,14 @@ export function generateAsycudaXml(declaration: Declaration): string {
     }
     xml += `      </Tariff>\n`;
 
-    // Goods description — VD does not emit Description_of_goods
+    // Goods description
     xml += `      <Goods_description>\n`;
     xml += t(8, 'Country_of_origin_code', s(item.countryOfOriginCode));
+    xml += t(8, 'Description_of_goods', s(item.descriptionOfGoods));
     xml += t(8, 'Commercial_description', s(item.commercialDescription));
     xml += `      </Goods_description>\n`;
 
+    // Valuation item
     xml += `      <Valuation_item>\n`;
     xml += `        <Weight>\n`;
     xml += t(10, 'Gross_weight_itm', n(item.grossWeight));
@@ -247,16 +258,10 @@ export function generateAsycudaXml(declaration: Declaration): string {
       xml += `      </Attached_documents>\n`;
     }
 
-    // Previous document (Field 40)
-    // FCL/direct → <Previous_document_reference>
-    // LCL/Air/Alcohol → <Summary_declaration> + <Summary_declaration_sl>
+    // Previous document (field 40)
     xml += `      <Previous_document>\n`;
-    if (isFCL) {
-      xml += t(8, 'Previous_document_reference', s(item.previousDocumentSummaryDeclaration));
-    } else {
-      xml += t(8, 'Summary_declaration', s(item.previousDocumentSummaryDeclaration));
-      xml += t(8, 'Summary_declaration_sl', s(item.previousDocumentSummaryDeclarationSubline));
-    }
+    xml += t(8, 'Summary_declaration', s(item.previousDocumentSummaryDeclaration));
+    xml += t(8, 'Summary_declaration_sl', s(item.previousDocumentSummaryDeclarationSubline));
     xml += `      </Previous_document>\n`;
 
     xml += `    </Item>\n`;

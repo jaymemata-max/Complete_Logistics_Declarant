@@ -24,7 +24,19 @@
       "Bash(sed -n 339,351p C:/Users/jayme/Downloads/complete-logistics-declarant/sprint1_CL_Customs/sprint1/supabase/seeds/seed_data.sql)",
       "Bash(npm run:*)",
       "Bash(jobs -l)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(curl -s -X POST https://api.supabase.com/v1/projects/aaivghpwsfcpjrsblbjb/database/query -H 'Authorization: Bearer sbp_184d4f07b1a29961041b02dfc80851c78120a2ec' -H 'Content-Type: application/json' -d '{:*)",
+      "Bash(curl -s -X GET https://api.supabase.com/v1/projects -H 'Authorization: Bearer sbp_184d4f07b1a29961041b02dfc80851c78120a2ec')",
+      "Bash(node -e \"const icons = require\\('C:/Users/jayme/Downloads/complete-logistics-declarant/node_modules/lucide-react'\\); console.log\\('BookTemplate:', !!icons.BookTemplate\\); console.log\\('SplitSquareHorizontal:', !!icons.SplitSquareHorizontal\\); console.log\\('lucide version:', require\\('C:/Users/jayme/Downloads/complete-logistics-declarant/node_modules/lucide-react/package.json'\\).version\\)\")",
+      "Bash(python3 -c \"import zipfile; z=zipfile.ZipFile\\('sprint2_CL_Customs.zip'\\); print\\('\\\\n'.join\\(z.namelist\\(\\)\\)\\)\")",
+      "Bash(powershell -Command 'Add-Type -Assembly System.IO.Compression.FileSystem; $z=[System.IO.Compression.ZipFile]::OpenRead\\('\\\\''C:/Users/jayme/Downloads/sprint2_CL_Customs.zip'\\\\''\\); $z.Entries | ForEach-Object { $_.FullName }')",
+      "Bash(powershell -Command 'Add-Type -Assembly System.IO.Compression.FileSystem; $z=[System.IO.Compression.ZipFile]::OpenRead\\('\\\\''C:/Users/jayme/Downloads/complete-logistics-declarant.zip'\\\\''\\); $z.Entries | ForEach-Object { $_.FullName }')",
+      "Bash(powershell -Command ':*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)"
     ]
   }
 }

@@ -4,14 +4,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { ArrowLeft, Save, FileText, Package, LayoutGrid, FileCode2, SplitSquareHorizontal, BookTemplate, CheckCircle2, XCircle, Car, Receipt } from 'lucide-react';
+import { ArrowLeft, Save, FileText, Package, LayoutGrid, FileCode2, SplitSquareHorizontal, BookTemplate, CheckCircle2, XCircle } from 'lucide-react';
 import { HeaderTab } from './tabs/HeaderTab';
 import { ItemsTab } from './tabs/ItemsTab';
 import { ContainersTab } from './tabs/ContainersTab';
-import { VehicleTab } from './tabs/VehicleTab';
 import { SplitTab } from './tabs/SplitTab';
 import { XmlPreviewTab } from './tabs/XmlPreviewTab';
-import { GenerateInvoiceModal } from './GenerateInvoiceModal';
 import { saveDeclaration, updateDeclarationStatus, saveTemplate } from '../lib/db';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -29,7 +27,6 @@ export const DeclarationWorkspace: React.FC = () => {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateCode, setTemplateCode] = useState('');
   const [templateDesc, setTemplateDesc] = useState('');
-  const [showInvoice, setShowInvoice] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
 
   if (!declaration) return null;
@@ -54,7 +51,7 @@ export const DeclarationWorkspace: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!window.confirm('Mark this declaration as submitted? This means you have uploaded the XML to ASYCUDAWorld. The status will change to Submitted.')) return;
+    if (!window.confirm('Submit this declaration to ASYCUDAWorld? This will change the status to Submitted.')) return;
     setSubmitting(true);
 
     // First save if it has local ID
@@ -99,15 +96,12 @@ export const DeclarationWorkspace: React.FC = () => {
       {/* Header */}
       <header className="px-6 py-4 flex items-center justify-between bg-primary text-primary-foreground z-10 shadow-md">
         <div className="flex items-center gap-6">
-          <button
-            className="flex items-center gap-2 pr-6 border-r border-primary-foreground/20 cursor-pointer bg-transparent border-0 p-0 text-left"
-            onClick={() => setDeclaration(null)}
-          >
+          <div className="flex items-center gap-2 pr-6 border-r border-primary-foreground/20">
             <div className="flex flex-col leading-none">
               <span className="font-bold text-white tracking-tight text-lg">Complete Logistics</span>
-              <span className="text-secondary tracking-widest text-xs uppercase mt-1" style={{fontWeight: 900, letterSpacing: '0.15em'}}>DECLARANT</span>
+              <span className="font-medium text-secondary tracking-widest text-xs uppercase mt-1">Declarant</span>
             </div>
-          </button>
+          </div>
           <Button
             variant="ghost"
             size="icon"
@@ -151,22 +145,6 @@ export const DeclarationWorkspace: React.FC = () => {
             </Button>
           )}
 
-          {/* Generate Invoice */}
-          {!declaration.id.startsWith('local-') ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-primary-foreground/80 hover:text-white hover:bg-primary-foreground/10 text-xs"
-              onClick={() => setShowInvoice(true)}
-            >
-              <Receipt className="h-4 w-4 mr-1" /> Generate Invoice
-            </Button>
-          ) : (
-            <span className="text-xs text-primary-foreground/50 px-2">
-              Save first to generate invoice
-            </span>
-          )}
-
           {!isReadOnly && (
             <Button
               variant="outline"
@@ -187,7 +165,7 @@ export const DeclarationWorkspace: React.FC = () => {
               onClick={handleSubmit}
               disabled={submitting}
             >
-              {submitting ? 'Submitting...' : 'Mark as Submitted'}
+              {submitting ? 'Submitting...' : 'Submit Declaration'}
             </Button>
           )}
 
@@ -243,7 +221,6 @@ export const DeclarationWorkspace: React.FC = () => {
               {[
                 { value: 'header', icon: FileText, label: 'Header' },
                 { value: 'items', icon: Package, label: 'Items' },
-                { value: 'vehicles', icon: Car, label: 'Vehicles' },
                 { value: 'containers', icon: LayoutGrid, label: 'Containers' },
                 { value: 'split', icon: SplitSquareHorizontal, label: 'Split / Degroupage' },
                 { value: 'xml', icon: FileCode2, label: 'XML Preview' },
@@ -265,9 +242,6 @@ export const DeclarationWorkspace: React.FC = () => {
               </TabsContent>
               <TabsContent value="items" className="mt-0">
                 <ItemsTab />
-              </TabsContent>
-              <TabsContent value="vehicles" className="mt-0">
-                <VehicleTab />
               </TabsContent>
               <TabsContent value="containers" className="mt-0">
                 <ContainersTab />
@@ -326,17 +300,6 @@ export const DeclarationWorkspace: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Generate Invoice modal */}
-      {showInvoice && !declaration.id.startsWith('local-') && (
-        <GenerateInvoiceModal
-          declarationId={declaration.id}
-          consigneeName={declaration.header.consigneeName}
-          declarationDisplay={declaration.header.declarationId}
-          onCreated={() => setShowInvoice(false)}
-          onClose={() => setShowInvoice(false)}
-        />
       )}
     </div>
   );
